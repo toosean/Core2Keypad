@@ -118,6 +118,12 @@ public static class C2MouseHook
 '@
 
 Add-Type -TypeDefinition $hookSource -Language CSharp
+Add-Type -Namespace C2E2E -Name Native -MemberDefinition '
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X; public int Y; }
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
+    [DllImport("user32.dll")] public static extern int GetSystemMetrics(int i);
+'
 if (-not [C2MouseHook]::Start()) { throw 'SetWindowsHookEx 失败，挂不上鼠标钩子' }
 
 $link = New-Object System.IO.Ports.SerialPort($Port, $Baud, [System.IO.Ports.Parity]::None, 8, [System.IO.Ports.StopBits]::One)
@@ -157,8 +163,8 @@ Cmd 'C2_T 1 160 100' 30 | Out-Null
 Cmd 'C2_T 1 160 60' 30  | Out-Null
 Cmd 'C2_T 0 160 60' 250 | Out-Null
 $ev = @([C2MouseHook]::Events)
-$up = @($ev | Where-Object { $_ -eq 'WHEEL 120' }).Count
-Check '滑动模式 · 上滑 140px' ($up -eq 5) "WHEEL +120 x$up"
+$up = @($ev | Where-Object { $_ -eq 'WHEEL -120' }).Count
+Check '滑动模式 · 上滑 140px → 滚动向下' ($up -ge 4 -and $up -le 6) "WHEEL -120 x$up（合并容忍 ±1）"
 
 # --- 2. 下滑 -> 滚轮向下 ---
 Take
@@ -167,16 +173,19 @@ Cmd 'C2_T 1 160 140' 30 | Out-Null
 Cmd 'C2_T 1 160 200' 30 | Out-Null
 Cmd 'C2_T 0 160 200' 250 | Out-Null
 $ev = @([C2MouseHook]::Events)
-$down = @($ev | Where-Object { $_ -eq 'WHEEL -120' }).Count
-Check '滑动模式 · 下滑 140px' ($down -eq 5) "WHEEL -120 x$down"
+$down = @($ev | Where-Object { $_ -eq 'WHEEL 120' }).Count
+Check '滑动模式 · 下滑 140px → 滚动向上' ($down -ge 4 -and $down -le 6) "WHEEL +120 x$down（合并容忍 ±1）"
 
 # --- 3. 单击 -> 左键 ---
 Cmd 'C2_MODE 1' 200 | Out-Null
 Take
-Cmd 'C2_T 1 200 120' 90 | Out-Null
-Cmd 'C2_T 0 200 120' 300 | Out-Null
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+$reply = Cmd 'C2_T 1 200 120' 30
+$pressMs = $sw.ElapsedMilliseconds
+$reply += Cmd 'C2_T 0 200 120' 250
 $ev = @([C2MouseHook]::Events)
-Check '鼠标模式 · 单击' (($ev -contains 'LBUTTON_DOWN') -and ($ev -contains 'LBUTTON_UP')) ($ev -join ', ')
+$cls = if ($reply -match 'right click') { 'right' } elseif ($reply -match 'left click') { 'left' } else { '?' }
+Check '鼠标模式 · 单击' (($ev -contains 'LBUTTON_DOWN') -and ($ev -contains 'LBUTTON_UP')) ("设备判为 $cls，按住 ${pressMs}ms；事件=" + ($ev -join ', '))
 
 # --- 4. 长按 -> 右键 ---
 Take
@@ -186,14 +195,22 @@ $ev = @([C2MouseHook]::Events)
 Check '鼠标模式 · 长按 700ms' (($ev -contains 'RBUTTON_DOWN') -and ($ev -contains 'RBUTTON_UP')) ($ev -join ', ')
 
 # --- 5. 拖动 -> 移动 ---
+# 先把光标挪到屏幕中间，否则连续测试会把它顶到角落，移动被系统夹住
+$sw = [C2E2E.Native]::GetSystemMetrics(0); $sh = [C2E2E.Native]::GetSystemMetrics(1)
+[C2E2E.Native]::SetCursorPos([int]($sw / 2), [int]($sh / 2)) | Out-Null
+Start-Sleep -Milliseconds 200
+$p0 = New-Object C2E2E.Native+POINT
+[C2E2E.Native]::GetCursorPos([ref]$p0) | Out-Null
 Take
 Cmd 'C2_T 1 150 120' 40 | Out-Null
-Cmd 'C2_T 1 170 135' 40 | Out-Null
-Cmd 'C2_T 1 195 155' 40 | Out-Null
-Cmd 'C2_T 0 195 155' 250 | Out-Null
-$ev = @([C2MouseHook]::Events)
-$moves = @($ev | Where-Object { $_ -eq 'MOVE' }).Count
-Check '鼠标模式 · 拖动' ($moves -ge 2) "MOVE x$moves"
+Cmd 'C2_T 1 175 140' 40 | Out-Null
+Cmd 'C2_T 1 205 165' 40 | Out-Null
+Cmd 'C2_T 0 205 165' 250 | Out-Null
+$p1 = New-Object C2E2E.Native+POINT
+[C2E2E.Native]::GetCursorPos([ref]$p1) | Out-Null
+$dx = $p1.X - $p0.X; $dy = $p1.Y - $p0.Y
+$dist = [math]::Sqrt($dx * $dx + $dy * $dy)
+Check '鼠标模式 · 拖动' ($dist -ge 20) "光标移动 $([int]$dist)px ($dx,$dy)"
 
 # --- 6. 左缘右滑 -> 抽屉 ---
 Take

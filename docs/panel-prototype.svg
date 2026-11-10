@@ -104,7 +104,7 @@
     <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
     <g clip-path="url(#frameClip)">
       <use xlink:href="#chrome" width="320" height="240"/>
-      <use xlink:href="#vibOn" x="264" y="8.5" width="16" height="14"/>
+      <use xlink:href="#vibOn" x="271" y="10.4" width="11" height="9.6"/>
 
       <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#102A38" stroke="#38BDF8" stroke-width="0.9"/>
       <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#7DD3FC" text-anchor="middle">SLIDE</text>
@@ -135,24 +135,24 @@
     <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
     <g clip-path="url(#frameClip)">
       <use xlink:href="#chrome" width="320" height="240"/>
-      <use xlink:href="#vibOn" x="264" y="8.5" width="16" height="14"/>
+      <use xlink:href="#vibOn" x="271" y="10.4" width="11" height="9.6"/>
 
       <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#102A38" stroke="#38BDF8" stroke-width="0.9"/>
       <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#7DD3FC" text-anchor="middle">SLIDE</text>
 
-      <path d="M128 104 L160 136 L192 104" fill="none" stroke="#FBBF24" stroke-width="9"
+      <path d="M128 136 L160 104 L192 136" fill="none" stroke="#38BDF8" stroke-width="9"
             stroke-linecap="round" stroke-linejoin="round"/>
 
-      <text x="160" y="168" font-size="14" font-weight="700" letter-spacing="1.6" fill="#E8F2FF" text-anchor="middle">SCROLL DOWN</text>
-      <text x="160" y="184" font-size="8" letter-spacing="2" fill="#8A6A24" text-anchor="middle">4 NOTCHES</text>
+      <text x="160" y="168" font-size="14" font-weight="700" letter-spacing="1.6" fill="#E8F2FF" text-anchor="middle">SCROLL UP</text>
+      <text x="160" y="184" font-size="8" letter-spacing="2" fill="#2E6F92" text-anchor="middle">4 NOTCHES</text>
 
       <rect x="110" y="194" width="100" height="3.5" rx="1.75" fill="#16232E"/>
-      <rect x="110" y="194" width="68" height="3.5" rx="1.75" fill="#FBBF24"/>
+      <rect x="110" y="194" width="68" height="3.5" rx="1.75" fill="#38BDF8"/>
 
     </g>
     <rect width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
   </g>
-  <text x="440" y="392" font-size="12" letter-spacing="0.2" fill="#7C94A8">② 下滑 → 滚轮向下（上滑镜像，蓝 / 琥珀对调）</text>
+  <text x="440" y="392" font-size="12" letter-spacing="0.2" fill="#7C94A8">② 下滑 → 滚轮向上（自然滚动，上滑则向下）</text>
 
   <!-- ================================================================
        ③ 抽屉 · 振动开 + 滑动模式
@@ -161,7 +161,7 @@
     <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
     <g clip-path="url(#frameClip)">
       <use xlink:href="#chrome" width="320" height="240"/>
-      <use xlink:href="#vibOn" x="264" y="8.5" width="16" height="14"/>
+      <use xlink:href="#vibOn" x="271" y="10.4" width="11" height="9.6"/>
 
       <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#102A38" stroke="#38BDF8" stroke-width="0.9"/>
       <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#7DD3FC" text-anchor="middle">SLIDE</text>
@@ -234,7 +234,7 @@
     <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
     <g clip-path="url(#frameClip)">
       <use xlink:href="#chrome" width="320" height="240"/>
-      <use xlink:href="#vibOn" x="264" y="8.5" width="16" height="14"/>
+      <use xlink:href="#vibOn" x="271" y="10.4" width="11" height="9.6"/>
 
       <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#2A2110" stroke="#FBBF24" stroke-width="0.9"/>
       <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#FCD34D" text-anchor="middle">MOUSE</text>
@@ -265,7 +265,7 @@
     <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
     <g clip-path="url(#frameClip)">
       <use xlink:href="#chrome" width="320" height="240"/>
-      <use xlink:href="#vibOn" x="264" y="8.5" width="16" height="14"/>
+      <use xlink:href="#vibOn" x="271" y="10.4" width="11" height="9.6"/>
 
       <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#2A2110" stroke="#FBBF24" stroke-width="0.9"/>
       <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#FCD34D" text-anchor="middle">MOUSE</text>
@@ -307,7 +307,7 @@
     <text x="812" y="786" font-size="11.5" font-weight="600" letter-spacing="0.6" fill="#8FA6B8">状态与降级</text>
     <text x="812" y="812" font-size="10.2" fill="#4E6478">未连接：面板盖 NOT CONNECTED 水印，手势不发</text>
     <text x="812" y="832" font-size="10.2" fill="#4E6478">鼠标灵敏度：1 屏幕像素 ≈ 1.2 个鼠标计数</text>
-    <text x="812" y="852" font-size="10.2" fill="#4E6478">空闲 3 秒后屏幕照旧降到 20% 亮度</text>
+    <text x="812" y="852" font-size="10.2" fill="#4E6478">空闲 3 秒降到 20% 亮度；5 分钟无动作自动睡眠，轻触即醒</text>
     <text x="812" y="872" font-size="10.2" fill="#4E6478">振动 / 模式选择都写 NVS，重启保留</text>
   </g>
 

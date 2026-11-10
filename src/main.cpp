@@ -46,7 +46,8 @@ static constexpr uint32_t TAP_MS  = 220;
 static constexpr uint32_t HOLD_MS = 500;
 static constexpr uint16_t BUZZ_MS = 40;
 static constexpr uint32_t RIPPLE_MS = 260;
-static constexpr uint32_t SCROLL_HOLD_MS = 500;
+static constexpr uint32_t SCROLL_HOLD_MS = 3000;   // 滑动结束后提示再留 3 秒
+static constexpr uint32_t SLEEP_MS = 5UL * 60UL * 1000UL;  // 5 分钟无动作 -> 睡眠
 static constexpr int  MOUSE_DIV   = 10;    // 定点：1px = 12/10 个鼠标计数
 
 // ---------------------------------------------------------------- 颜色
@@ -104,6 +105,9 @@ static uint32_t g_advAt = 0;
 static uint32_t g_advRetryAt = 0;
 static uint8_t  g_battPct   = 0;
 static uint16_t g_boots     = 0;   // 开机次数（NVS），用来抓意外重启
+static bool     g_asleep    = false;
+static bool     g_ignoreTouch = false;   // 唤醒那一下不算手势
+static uint32_t g_lastActionMs = 0;      // 最后一次「用户动作」
 static Preferences g_prefs;
 
 // 重绘调度
@@ -117,8 +121,12 @@ static void requestRedraw(uint16_t delayMs = 0)
     g_renderAt = millis() + delayMs;
 }
 
+// 任何用户动作都算「活跃」，用来推迟自动睡眠
+static inline void markActivity() { g_lastActionMs = millis(); }
+
 static void setMode(uint8_t m)
 {
+    markActivity();
     if (m >= MODE_COUNT || m == g_mode) return;
     g_mode = m;
     g_prefs.putUChar("mode", m);
@@ -128,6 +136,7 @@ static void setMode(uint8_t m)
 
 static void openDrawer()
 {
+    markActivity();
     g_drawer = true;
     Serial.println("[UI] drawer open");
     requestRedraw();
@@ -153,6 +162,7 @@ static void buzz(uint16_t ms)
 
 static void toggleVib()
 {
+    markActivity();
     g_vib = !g_vib;
     g_prefs.putUChar("vib", g_vib ? 1 : 0);
     if (!g_vib && g_vibMotor) {
@@ -389,6 +399,7 @@ static uint32_t g_injUntil = 0;
 
 static void mouseClick(bool right, int x, int y)
 {
+    markActivity();
     sendMouse(right ? 0x02 : 0x01, 0, 0, 0);
     delay(20);                              // 按下停留一下，主机才不会当毛刺
     sendMouse(0, 0, 0, 0);
@@ -403,6 +414,7 @@ static void mouseClick(bool right, int x, int y)
 
 static void onPress(int x, int y, uint32_t now)
 {
+    markActivity();
     g_pressed = true;
     g_x0 = (int16_t)x; g_y0 = (int16_t)y;
     g_px = (int16_t)x; g_py = (int16_t)y;
@@ -470,6 +482,7 @@ static void feedTouch(bool pressed, int x, int y)
     if (g_drawer || g_edge) return;        // 这两类只在抬手时判定
     if (g_mode == MODE_MOUSE) {
         if (g_rightFired || !g_moved) return;
+        markActivity();
         mouseMove(dx, dy);
         return;
     }
@@ -479,20 +492,22 @@ static void feedTouch(bool pressed, int x, int y)
 
     g_accum += dy;
     while (g_notches < MAX_NOTCHES) {
-        if (g_accum >= NOTCH_PX) {
+        if (g_accum >= NOTCH_PX) {              // 手指下滑 -> 发「向上滚」
             g_accum -= NOTCH_PX;
-            g_notches++;
-            g_scrollDir = -1;
-            sendMouse(0, 0, 0, -1);
-        } else if (g_accum <= -NOTCH_PX) {
-            g_accum += NOTCH_PX;
             g_notches++;
             g_scrollDir = +1;
             sendMouse(0, 0, 0, +1);
+        } else if (g_accum <= -NOTCH_PX) {      // 手指上滑 -> 发「向下滚」
+            g_accum += NOTCH_PX;
+            g_notches++;
+            g_scrollDir = -1;
+            sendMouse(0, 0, 0, -1);
         } else {
             break;
         }
         if (g_notches == 1) buzz(BUZZ_MS);
+        delay(3);                       // 别让主机把连续滚轮合并掉
+        markActivity();
         g_scrollUntil = now + SCROLL_HOLD_MS;
         requestRedraw(40);
     }
@@ -525,6 +540,14 @@ static void drawVibGlyph(int cx, int cy, uint16_t c)
     canvas.drawArc(cx, cy, 9, 11, 128, 232, c);
 }
 
+// 状态条里的小号版本（电量左侧），比抽屉里的图标小一圈
+static void drawVibGlyphSmall(int cx, int cy, uint16_t c)
+{
+    canvas.fillRoundRect(cx - 1, cy - 5, 2, 10, 1, c);
+    canvas.drawArc(cx, cy, 4, 5, -45, 45, c);
+    canvas.drawArc(cx, cy, 4, 5, 135, 225, c);
+}
+
 static void drawStatusBar(bool dim, uint32_t now)
 {
     (void)now;
@@ -548,7 +571,7 @@ static void drawStatusBar(bool dim, uint32_t now)
     canvas.setTextColor(g_connected ? (dim ? dimc(C_GREEN_T) : C_GREEN_T) : C_DIM);
     canvas.drawString(g_connected ? "CONNECTED" : "WAITING", 176, 11);
 
-    if (g_vib) drawVibGlyph(264, 15, dim ? dimc(C_BLUE_L) : C_BLUE_L);
+    if (g_vib) drawVibGlyphSmall(272, 15, dim ? dimc(C_BLUE_L) : C_BLUE_L);
 
     canvas.setTextDatum(textdatum_t::top_right);
     canvas.setTextColor(dim ? dimc(C_DIM) : C_DIM);
@@ -607,7 +630,7 @@ static void drawMouseIdle(bool dim)
 
 static void drawScrollOverlay()
 {
-    const bool down = (g_scrollDir < 0);
+    const bool down = (g_scrollDir < 0);      // 箭头表示滚动的方向，不是手指的方向
     const uint16_t acc = down ? C_AMBER : C_BLUE;
 
     if (down) {
@@ -764,6 +787,36 @@ static void updateBrightness(uint32_t now)
     applyBrightness((uint8_t)(kBrightMax - span * e / kFadeMs));
 }
 
+// ---------------------------------------------------------------- 睡眠
+// 5 分钟没有动作 -> 关屏 + 降频，但 BLE 不断开（当键盘用，断链再重连体验太差）。
+// 触摸屏照旧供电，轮询到一次按下就立刻唤醒，并吞掉这一下，避免刚亮屏就误触发手势。
+static void enterSleep(uint32_t now)
+{
+    if (g_asleep) return;
+    g_asleep = true;
+    g_drawer = false;
+    g_notches = 0;
+    Serial.printf("[PWR] sleep after %lus idle\n", (unsigned long)((now - g_lastActionMs) / 1000));
+    canvas.fillScreen(C_BG);
+    canvas.pushSprite(0, 0);
+    M5.Display.setBrightness(0);
+    M5.Display.sleep();
+    setCpuFrequencyMhz(80);
+}
+
+static void wakeUp(uint32_t now)
+{
+    if (!g_asleep) return;
+    g_asleep = false;
+    setCpuFrequencyMhz(240);
+    M5.Display.wakeup();
+    g_brightness = 0;                 // 强制重设亮度
+    applyBrightness(kBrightMax);
+    g_lastInputMs = now;
+    g_lastActionMs = now;
+    Serial.println("[PWR] wake");
+    requestRedraw();
+}
 // ---------------------------------------------------------------- 截图（非阻塞）
 // 一次 C2_SCREEN 要发 230KB；如果整段阻塞在 loop 里，BLE 链路会被拖到超时
 // （实测 reason=0x08）。所以拆成小批：每次只写「串口缓冲还放得下」的量，
@@ -776,6 +829,7 @@ static uint8_t  g_capRow[W * 3];
 
 static void captureBegin()
 {
+    if (g_asleep) { Serial.println("C2_ERROR asleep"); return; }
     const uint16_t *buf = g_canvas ? static_cast<const uint16_t *>(canvas.getBuffer()) : nullptr;
     if (!buf) { Serial.println("C2_ERROR no_framebuffer"); return; }
     Serial.printf("C2_SCREEN %d %d %u\n", W, H, (unsigned)(W * 3 * H));
@@ -838,9 +892,9 @@ static void handleSerial()
             if (command == "C2_SCREEN") {
                 captureBegin();
             } else if (command == "C2_INFO") {
-                Serial.printf("C2_INFO core2keypad-2.0 %dx%d mode=%s vib=%d connected=%d drawer=%d notches=%d up=%lus boot=%u heap=%u\n",
+                Serial.printf("C2_INFO core2keypad-2.0 %dx%d mode=%s vib=%d connected=%d drawer=%d notches=%d asleep=%d pressed=%d held=%lu up=%lus boot=%u heap=%u\n",
                               W, H, kModeName[g_mode], g_vib ? 1 : 0, g_connected ? 1 : 0,
-                              g_drawer ? 1 : 0, g_notches, (unsigned long)(millis() / 1000), (unsigned)g_boots, (unsigned)ESP.getFreeHeap());
+                              g_drawer ? 1 : 0, g_notches, g_asleep ? 1 : 0, g_pressed ? 1 : 0, (unsigned long)(g_pressed ? (millis() - g_t0) : 0), (unsigned long)(millis() / 1000), (unsigned)g_boots, (unsigned)ESP.getFreeHeap());
             } else if (command == "C2_BLE") {
                 BLEService *hid = g_server ? g_server->getServiceByUUID(BLEUUID((uint16_t)0x1812)) : nullptr;
                 Serial.printf("C2_BLE srv=%d hid=%d handle=%u conn=%d\n",
@@ -873,13 +927,16 @@ static void handleSerial()
                     Serial.println("C2_ERROR bad_value");
                 }
             } else if (command == "C2_DISC") {
-        if (g_connected) {
-            g_server->disconnect(g_server->getConnId());
-            Serial.println("C2_DISC sent");
-        } else {
-            Serial.println("C2_DISC not_connected");
-        }
-    } else if (command == "C2_BUZZ") {
+                if (g_connected) {
+                    g_server->disconnect(g_server->getConnId());
+                    Serial.println("C2_DISC sent");
+                } else {
+                    Serial.println("C2_DISC not_connected");
+                }
+            } else if (command == "C2_SLEEP") {
+                enterSleep(millis() + SLEEP_MS);      // 强制睡眠（测试用）
+                Serial.println("C2_SLEEP ok");
+            } else if (command == "C2_BUZZ") {
                 const bool ok = M5.Power.setVibration(1);
                 if (ok) { delay(BUZZ_MS); M5.Power.setVibration(0); }
                 Serial.printf("C2_BUZZ ok=%d vib=%d\n", ok ? 1 : 0, g_vib ? 1 : 0);
@@ -926,6 +983,7 @@ void setup()
     Serial.begin(921600);
     delay(150);
     g_lastInputMs = millis();
+    g_lastActionMs = millis();
     applyBrightness(kBrightMax);
 
     // 先占帧缓冲，再起 BLE（BLE 协议栈吃内存，顺序反了 sprite 会分配失败）
@@ -963,6 +1021,25 @@ void loop()
     M5.update();
     const uint32_t now = millis();
 
+    // ---- 睡眠中：只等一次触摸把屏幕叫醒 ----
+    if (g_asleep) {
+        const bool injected = g_inject && (int32_t)(now - g_injUntil) < 0;
+        const bool touching = injected ? g_injPressed : M5.Touch.getDetail().isPressed();
+        if (touching) {
+            wakeUp(now);
+            g_ignoreTouch = true;
+        } else {
+            handleSerial();
+            delay(20);
+            return;
+        }
+    }
+
+    if ((uint32_t)(now - g_lastActionMs) > SLEEP_MS) {
+        enterSleep(now);
+        return;
+    }
+
     capturePump();                       // 截图分批发，不阻塞链路
     if (g_capActive) {
         // 截图期间也要把马达按时关掉，否则一次截图能把震动拖成 3 秒
@@ -977,7 +1054,12 @@ void loop()
     static bool blocked = false;      // 起点在状态条上的触摸整段忽略
     static uint32_t battAt = 0;
 
-    if (g_inject && (int32_t)(now - g_injUntil) < 0) {
+    const bool injected = g_inject && (int32_t)(now - g_injUntil) < 0;
+    const bool touching = injected ? g_injPressed : M5.Touch.getDetail().isPressed();
+
+    if (g_ignoreTouch) {
+        if (!touching) g_ignoreTouch = false;      // 抬手后解除
+    } else if (injected) {
         feedTouch(g_injPressed, g_injX, g_injY);
         blocked = false;
     } else {
@@ -1022,6 +1104,13 @@ void loop()
 
     handleSerial();
     updateBrightness(now);
+
+    // 滚动提示到点后要主动重绘一次，否则它会一直留在屏幕上
+    if (g_notches && (int32_t)(now - g_scrollUntil) >= 0) {
+        g_notches = 0;
+        g_scrollDir = 0;
+        requestRedraw();
+    }
 
     const bool anim = holdCandidate(now) ||
                       (g_rippleAt && (now - g_rippleAt) < RIPPLE_MS);
