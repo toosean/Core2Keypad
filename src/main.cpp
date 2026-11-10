@@ -198,6 +198,18 @@ static esp_gatt_if_t g_gattsIf = ESP_GATT_IF_NONE;
 
 // BLEServer::getGattsIf() 是私有的，但 BLEDevice 支持再挂一个 handler（在原处理之后调用），
 // 用它把 gatts_if 记下来，定向发送时要用。
+// 连接参数协商结果：间隔直接决定鼠标的跟手程度
+static void onGapEvent(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
+{
+    if (event == ESP_GAP_BLE_UPDATE_CONN_PARAMS_EVT) {
+        Serial.printf("[BLE] conn interval=%.1fms latency=%u timeout=%ums status=%d\n",
+                      param->update_conn_params.conn_int * 1.25f,
+                      param->update_conn_params.latency,
+                      param->update_conn_params.timeout * 10,
+                      param->update_conn_params.status);
+    }
+}
+
 static void onGattsEvent(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                          esp_ble_gatts_cb_param_t *param)
 {
@@ -401,6 +413,17 @@ class ServerCB : public BLEServerCallbacks {
         cccdRestore();
         Serial.printf("[BLE] connected conn=%u online=%d\n",
                       (unsigned)param->connect.conn_id, linkCount());
+
+        // 默认连接间隔往往 30–50ms，对鼠标来说就是几十毫秒的延迟；
+        // 主动请求 7.5–15ms（主机可以不接受，结果看 [BLE] conn interval 日志）
+        esp_ble_conn_update_params_t cp;
+        memset(&cp, 0, sizeof(cp));
+        memcpy(cp.bda, param->connect.remote_bda, 6);
+        cp.min_int = 6;      // 7.5ms
+        cp.max_int = 6;      // 7.5ms
+        cp.latency = 0;
+        cp.timeout = 400;    // 4s
+        esp_ble_gap_update_conn_params(&cp);
         // 连接后继续广播，好让第二、三台连进来
         g_advPending = true;
         g_advAt = millis() + 250;
@@ -479,6 +502,7 @@ static void bleInit()
 {
     BLEDevice::init("Core2 Keypad");
     BLEDevice::setCustomGattsHandler(onGattsEvent);
+    BLEDevice::setCustomGapHandler(onGapEvent);
     g_server = BLEDevice::createServer();
     g_server->setCallbacks(new ServerCB());
     BLEDevice::setSecurityCallbacks(new SecCB());
@@ -672,9 +696,9 @@ static void feedTouch(bool pressed, int x, int y)
 
     if (g_drawer || g_edge) return;        // 这两类只在抬手时判定
     if (g_mode == MODE_MOUSE) {
-        if (g_rightFired || !g_moved) return;
+        if (g_rightFired) return;
         markActivity();
-        mouseMove(dx, dy, g_dragActive ? 0x01 : 0);
+        mouseMove(dx, dy, g_dragActive ? 0x01 : 0);   // 1px 也立刻发，别等跨过死区
         return;
     }
 
@@ -1435,5 +1459,5 @@ void loop()
         g_needRender = false;
     }
 
-    delay(4);
+    delay(1);
 }

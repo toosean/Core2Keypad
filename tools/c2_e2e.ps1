@@ -222,7 +222,7 @@ Check '按住后拖动 → 左键拖拽' $dragOk ($ev -join ', ')
 
 # --- 5d. 多设备：切到空槽位时报告应被丢弃 ---
 $hosts = (Cmd 'C2_HOSTS' 300)
-$m = [regex]::Match($hosts, 'HOST conn=\d+ slot=D(\d)')
+$m = [regex]::Match((Info), 'slot=D(\d)')
 if ($m.Success) {
     $pcSlot = [int]$m.Groups[1].Value
     $other = if ($pcSlot -eq 3) { 1 } else { $pcSlot + 1 }
