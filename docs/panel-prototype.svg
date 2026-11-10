@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Core2Keypad —— 手势面板 UI 原型 v2.2（实施前审阅用）
+  320x240 横屏 · 1:1 像素坐标 · 屏幕内文字全部 ASCII（设备只有拉丁字库）
+
+  与固件的对应关系：
+    · 顶部状态条 0..30：标题 / 模式徽标 / 连接 / 振动图标 / 电量
+    · 交互面板 8..312 x 40..232：整块都是手势区，没有按钮、没有指针
+    · 左缘 0..8 是抽屉热区（细把手 + 小箭头），右滑 >= 60px 拉出工具栏
+    · 滑动模式：下滑 = 滚轮下，上滑 = 滚轮上；位移 >= 48px 触发一次
+    · 鼠标模式：拖动移动光标（画在主机上，屏幕里不画），单击左键，按住 500ms 右键
+    · 工具栏：两个 96x106 大图标块（VIBRATION / MODE），点亮 = 该状态生效
+-->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="1200" height="940" viewBox="0 0 1200 940"
+     font-family="'Segoe UI','Microsoft YaHei','PingFang SC','Noto Sans SC',system-ui,sans-serif">
+
+  <defs>
+    <linearGradient id="surf" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#101A24"/>
+      <stop offset="1" stop-color="#0B121A"/>
+    </linearGradient>
+
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#12324A" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#12324A" stop-opacity="0"/>
+    </radialGradient>
+
+    <pattern id="dots" width="16" height="16" patternUnits="userSpaceOnUse">
+      <circle cx="8" cy="8" r="0.9" fill="#17242F"/>
+    </pattern>
+
+    <filter id="frameShadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+
+    <filter id="cardShadow" x="-40%" y="-30%" width="180%" height="180%">
+      <feDropShadow dx="6" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+
+    <clipPath id="frameClip">
+      <rect width="320" height="240" rx="10"/>
+    </clipPath>
+
+    <clipPath id="surfClip">
+      <rect x="8" y="40" width="304" height="192" rx="18"/>
+    </clipPath>
+
+    <!-- 每屏共用的外壳：状态条 + 交互面板 -->
+    <symbol id="chrome" viewBox="0 0 320 240">
+      <rect width="320" height="240" fill="#0A0F15"/>
+      <text x="14" y="19" font-size="9" letter-spacing="1.8" fill="#54677A">CORE2 PANEL</text>
+      <circle cx="168" cy="15.5" r="3.2" fill="#34D399"/>
+      <text x="176" y="18.4" font-size="8.2" letter-spacing="1.1" fill="#5FCFA6">CONNECTED</text>
+      <text x="306" y="18.4" font-size="8.2" letter-spacing="0.6" fill="#4A6379" text-anchor="end">86%</text>
+      <line x1="0" y1="30" x2="320" y2="30" stroke="#16232E" stroke-width="1"/>
+      <rect x="8" y="40" width="304" height="192" rx="18" fill="url(#surf)" stroke="#1B2C3A" stroke-width="1"/>
+    </symbol>
+
+    <!-- 状态条里的"振动开启"小图标，落在电量百分比左侧 -->
+    <symbol id="vibOn" viewBox="0 0 16 14">
+      <rect x="6.6" y="1.4" width="2.6" height="11.2" rx="1.3" fill="#7DD3FC"/>
+      <path d="M11.4 2.2 q3.4 4.8 0 9.6" fill="none" stroke="#7DD3FC" stroke-width="1.3" stroke-linecap="round"/>
+      <path d="M4.4 2.2 q-3.4 4.8 0 9.6" fill="none" stroke="#7DD3FC" stroke-width="1.3" stroke-linecap="round"/>
+    </symbol>
+
+    <!-- 左缘抽屉把手 -->
+    <symbol id="pullTab" viewBox="0 0 8 36">
+      <rect width="6.5" height="36" rx="3.2" fill="#15222D"/>
+      <rect x="2.4" y="8" width="1.6" height="20" rx="0.8" fill="#2F4B60"/>
+    </symbol>
+
+    <!-- 工具栏大图标 -->
+    <symbol id="icoVib" viewBox="0 0 32 26">
+      <rect x="13" y="3" width="4.4" height="20" rx="2.2" fill="currentColor"/>
+      <path d="M23 4 q5 9 0 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M9 4 q-5 9 0 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="icoSlide" viewBox="0 0 32 34">
+      <path d="M8 12 L16 4 L24 12" fill="none" stroke="currentColor" stroke-width="2.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M8 22 L16 30 L24 22" fill="none" stroke="currentColor" stroke-width="2.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+
+    <symbol id="icoMouse" viewBox="0 0 30 32">
+      <rect x="1.4" y="4" width="27.2" height="21" rx="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
+      <circle cx="15" cy="14.5" r="3.1" fill="currentColor"/>
+    </symbol>
+  </defs>
+
+  <rect width="1200" height="940" fill="#06090D"/>
+
+  <!-- ==================== 标题 ==================== -->
+  <text x="64" y="58" font-size="26" font-weight="700" letter-spacing="0.4" fill="#E8F2FF">CORE2 PANEL — 手势面板 UI 原型</text>
+  <text x="64" y="86" font-size="12" letter-spacing="0.2" fill="#6E8699">320 × 240 · 滑动 / 鼠标两模式 · 振动可选 · 屏幕内文字保持 ASCII · 实施前审阅稿 v2.2</text>
+  <text x="64" y="106" font-size="11.5" letter-spacing="0.2" fill="#3C5163">整块屏幕是手势区；工具收进左侧抽屉，两个大图标块，点亮即生效。鼠标模式下屏幕里不画指针。</text>
+
+  <!-- ================================================================
+       ① 滑动模式 · 空闲
+       ================================================================ -->
+  <g transform="translate(64,126)">
+    <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
+    <g clip-path="url(#frameClip)">
+      <use xlink:href="#chrome" width="320" height="240"/>
+      <use xlink:href="#vibOn" x="264" y="8.5" width="16" height="14"/>
+
+      <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#102A38" stroke="#38BDF8" stroke-width="0.9"/>
+      <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#7DD3FC" text-anchor="middle">SLIDE</text>
+
+      <use xlink:href="#pullTab" x="0" y="102" width="8" height="36"/>
+      <path d="M10.5 114 L14.5 120 L10.5 126" fill="none" stroke="#2F4B60" stroke-width="1.4"
+            stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+
+      <ellipse cx="160" cy="136" rx="134" ry="86" fill="url(#glow)"/>
+
+      <path d="M146 100 L160 86 L174 100" fill="none" stroke="#31506A" stroke-width="2.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M146 186 L160 200 L174 186" fill="none" stroke="#6E5828" stroke-width="2.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+
+      <text x="160" y="133" font-size="11.5" letter-spacing="1.4" fill="#7C93A6" text-anchor="middle">SWIPE UP / DOWN</text>
+      <text x="160" y="151" font-size="8" letter-spacing="3" fill="#3A5266" text-anchor="middle">SCROLL</text>
+
+    </g>
+    <rect width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
+  </g>
+  <text x="64" y="392" font-size="12" letter-spacing="0.2" fill="#7C94A8">① 滑动模式 · 空闲：整屏是滚动面板，无按钮、无指针</text>
+
+  <!-- ================================================================
+       ② 滑动模式 · 下滑中
+       ================================================================ -->
+  <g transform="translate(440,126)">
+    <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
+    <g clip-path="url(#frameClip)">
+      <use xlink:href="#chrome" width="320" height="240"/>
+      <use xlink:href="#vibOn" x="264" y="8.5" width="16" height="14"/>
+
+      <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#102A38" stroke="#38BDF8" stroke-width="0.9"/>
+      <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#7DD3FC" text-anchor="middle">SLIDE</text>
+
+      <path d="M128 104 L160 136 L192 104" fill="none" stroke="#FBBF24" stroke-width="9"
+            stroke-linecap="round" stroke-linejoin="round"/>
+
+      <text x="160" y="168" font-size="14" font-weight="700" letter-spacing="1.6" fill="#E8F2FF" text-anchor="middle">SCROLL DOWN</text>
+      <text x="160" y="184" font-size="8" letter-spacing="2" fill="#8A6A24" text-anchor="middle">4 NOTCHES</text>
+
+      <rect x="110" y="194" width="100" height="3.5" rx="1.75" fill="#16232E"/>
+      <rect x="110" y="194" width="68" height="3.5" rx="1.75" fill="#FBBF24"/>
+
+    </g>
+    <rect width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
+  </g>
+  <text x="440" y="392" font-size="12" letter-spacing="0.2" fill="#7C94A8">② 下滑 → 滚轮向下（上滑镜像，蓝 / 琥珀对调）</text>
+
+  <!-- ================================================================
+       ③ 抽屉 · 振动开 + 滑动模式
+       ================================================================ -->
+  <g transform="translate(816,126)">
+    <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
+    <g clip-path="url(#frameClip)">
+      <use xlink:href="#chrome" width="320" height="240"/>
+      <use xlink:href="#vibOn" x="264" y="8.5" width="16" height="14"/>
+
+      <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#102A38" stroke="#38BDF8" stroke-width="0.9"/>
+      <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#7DD3FC" text-anchor="middle">SLIDE</text>
+
+      <rect width="320" height="240" fill="#04070B" opacity="0.72"/>
+
+      <rect x="-16" y="44" width="248" height="184" rx="18" fill="#0F1A24" stroke="#22303D"
+            stroke-width="1" filter="url(#cardShadow)"/>
+
+      <text x="20" y="70" font-size="8.6" letter-spacing="2.6" fill="#54677A">TOOLS</text>
+
+      <!-- 大图标 1：振动（点亮 = 开） -->
+      <rect x="16" y="82" width="96" height="106" rx="18" fill="#102A38" stroke="#38BDF8" stroke-width="1.4"/>
+      <use xlink:href="#icoVib" x="48" y="98" width="32" height="26" color="#7DD3FC"/>
+      <text x="64" y="154" font-size="9.2" font-weight="600" letter-spacing="0.8" fill="#E8F2FF" text-anchor="middle">VIBRATION</text>
+      <text x="64" y="171" font-size="7.6" letter-spacing="1.6" fill="#7DD3FC" text-anchor="middle">ON</text>
+
+      <!-- 大图标 2：模式（当前值写在下面） -->
+      <rect x="124" y="82" width="96" height="106" rx="18" fill="#0D1822" stroke="#22303D" stroke-width="1"/>
+      <use xlink:href="#icoSlide" x="156" y="94" width="32" height="34" color="#38BDF8"/>
+      <text x="172" y="154" font-size="9.2" font-weight="600" letter-spacing="0.8" fill="#C9D8E6" text-anchor="middle">MODE</text>
+      <text x="172" y="171" font-size="7.6" letter-spacing="1.6" fill="#7DD3FC" text-anchor="middle">SLIDE</text>
+
+      <text x="20" y="212" font-size="7.2" letter-spacing="1.4" fill="#33475A">TAP A TILE TO TOGGLE</text>
+    </g>
+    <rect width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
+  </g>
+  <text x="816" y="392" font-size="12" letter-spacing="0.2" fill="#7C94A8">③ 抽屉 · 振动开 + 滑动模式（两块都点亮）</text>
+
+  <!-- ================================================================
+       ④ 抽屉 · 振动关 + 鼠标模式
+       ================================================================ -->
+  <g transform="translate(64,450)">
+    <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
+    <g clip-path="url(#frameClip)">
+      <use xlink:href="#chrome" width="320" height="240"/>
+
+      <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#2A2110" stroke="#FBBF24" stroke-width="0.9"/>
+      <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#FCD34D" text-anchor="middle">MOUSE</text>
+
+      <rect width="320" height="240" fill="#04070B" opacity="0.72"/>
+
+      <rect x="-16" y="44" width="248" height="184" rx="18" fill="#0F1A24" stroke="#22303D"
+            stroke-width="1" filter="url(#cardShadow)"/>
+
+      <text x="20" y="70" font-size="8.6" letter-spacing="2.6" fill="#54677A">TOOLS</text>
+
+      <!-- 大图标 1：振动（灭 = 关） -->
+      <rect x="16" y="82" width="96" height="106" rx="18" fill="#0C1520" stroke="#1B2C3A" stroke-width="1"/>
+      <use xlink:href="#icoVib" x="48" y="98" width="32" height="26" color="#3B5265"/>
+      <text x="64" y="154" font-size="9.2" font-weight="600" letter-spacing="0.8" fill="#6E8699" text-anchor="middle">VIBRATION</text>
+      <text x="64" y="171" font-size="7.6" letter-spacing="1.6" fill="#3E5568" text-anchor="middle">OFF</text>
+
+      <!-- 大图标 2：模式（当前值写在下面） -->
+      <rect x="124" y="82" width="96" height="106" rx="18" fill="#1E1808" stroke="#FBBF24" stroke-width="1.4"/>
+      <use xlink:href="#icoMouse" x="157" y="96" width="30" height="32" color="#FCD34D"/>
+      <text x="172" y="154" font-size="9.2" font-weight="600" letter-spacing="0.8" fill="#E8F2FF" text-anchor="middle">MODE</text>
+      <text x="172" y="171" font-size="7.6" letter-spacing="1.6" fill="#FCD34D" text-anchor="middle">MOUSE</text>
+
+      <text x="20" y="212" font-size="7.2" letter-spacing="1.4" fill="#33475A">TAP A TILE TO TOGGLE</text>
+    </g>
+    <rect width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
+  </g>
+  <text x="64" y="716" font-size="12" letter-spacing="0.2" fill="#7C94A8">④ 抽屉 · 振动关 + 鼠标模式（灭 = 关，状态条无振动图标）</text>
+
+  <!-- ================================================================
+       ⑤ 鼠标模式 · 单击 = 左键
+       ================================================================ -->
+  <g transform="translate(440,450)">
+    <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
+    <g clip-path="url(#frameClip)">
+      <use xlink:href="#chrome" width="320" height="240"/>
+      <use xlink:href="#vibOn" x="264" y="8.5" width="16" height="14"/>
+
+      <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#2A2110" stroke="#FBBF24" stroke-width="0.9"/>
+      <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#FCD34D" text-anchor="middle">MOUSE</text>
+
+      <use xlink:href="#pullTab" x="0" y="102" width="8" height="36"/>
+      <path d="M10.5 114 L14.5 120 L10.5 126" fill="none" stroke="#2F4B60" stroke-width="1.4"
+            stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+
+      <rect x="8" y="40" width="304" height="192" fill="url(#dots)" clip-path="url(#surfClip)" opacity="0.6"/>
+
+      <circle cx="146" cy="122" r="14" fill="none" stroke="#38BDF8" stroke-width="2"/>
+      <circle cx="146" cy="122" r="20" fill="none" stroke="#38BDF8" stroke-width="2" opacity="0.45"/>
+      <circle cx="146" cy="122" r="26" fill="none" stroke="#38BDF8" stroke-width="1.6" opacity="0.18"/>
+
+      <rect x="166" y="86" width="76" height="20" rx="10" fill="#102A38" stroke="#38BDF8" stroke-width="0.9"/>
+      <text x="204" y="99.6" font-size="7.6" font-weight="600" letter-spacing="1.1" fill="#7DD3FC" text-anchor="middle">LEFT CLICK</text>
+
+      <text x="160" y="218" font-size="7.4" letter-spacing="1.2" fill="#3A5164" text-anchor="middle">DRAG TO MOVE · TAP LEFT · HOLD RIGHT</text>
+    </g>
+    <rect width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
+  </g>
+  <text x="440" y="716" font-size="12" letter-spacing="0.2" fill="#7C94A8">⑤ 单击 = 左键（落点涟漪 + 短震，屏幕里没有指针）</text>
+
+  <!-- ================================================================
+       ⑥ 鼠标模式 · 长按 = 右键
+       ================================================================ -->
+  <g transform="translate(816,450)">
+    <rect width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
+    <g clip-path="url(#frameClip)">
+      <use xlink:href="#chrome" width="320" height="240"/>
+      <use xlink:href="#vibOn" x="264" y="8.5" width="16" height="14"/>
+
+      <rect x="100" y="7" width="54" height="17" rx="8.5" fill="#2A2110" stroke="#FBBF24" stroke-width="0.9"/>
+      <text x="127" y="19" font-size="7.6" font-weight="600" letter-spacing="1" fill="#FCD34D" text-anchor="middle">MOUSE</text>
+
+      <rect x="8" y="40" width="304" height="192" fill="url(#dots)" clip-path="url(#surfClip)" opacity="0.6"/>
+
+      <circle cx="150" cy="122" r="24" fill="none" stroke="#1B2C3A" stroke-width="4"/>
+      <circle cx="150" cy="122" r="24" fill="none" stroke="#FBBF24" stroke-width="4"
+              stroke-linecap="round" stroke-dasharray="113 151" transform="rotate(-90 150 122)"/>
+
+      <rect x="172" y="86" width="82" height="20" rx="10" fill="#2A2110" stroke="#FBBF24" stroke-width="0.9"/>
+      <text x="213" y="99.6" font-size="7.6" font-weight="600" letter-spacing="1.1" fill="#FCD34D" text-anchor="middle">RIGHT CLICK</text>
+
+      <text x="150" y="172" font-size="7.6" letter-spacing="1.6" fill="#6B5620" text-anchor="middle">HOLD 500 ms</text>
+
+      <text x="160" y="218" font-size="7.4" letter-spacing="1.2" fill="#3A5164" text-anchor="middle">DRAG TO MOVE · TAP LEFT · HOLD RIGHT</text>
+    </g>
+    <rect width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
+  </g>
+  <text x="816" y="716" font-size="12" letter-spacing="0.2" fill="#7C94A8">⑥ 按住 500 ms = 右键（环形进度，抬手早了则取消）</text>
+
+  <!-- ==================== 说明条 ==================== -->
+  <g>
+    <rect x="64" y="760" width="344" height="132" rx="14" fill="#0B1118" stroke="#16232E" stroke-width="1"/>
+    <text x="84" y="786" font-size="11.5" font-weight="600" letter-spacing="0.6" fill="#8FA6B8">手势判定（建议值，可调）</text>
+    <text x="84" y="812" font-size="10.2" fill="#4E6478">上下滑：纵向位移 ≥ 48px 且 |dy| &gt; |dx|</text>
+    <text x="84" y="832" font-size="10.2" fill="#4E6478">滚动格数随位移增加：每 24px 加 1 格，上限 12</text>
+    <text x="84" y="852" font-size="10.2" fill="#4E6478">左缘右滑：起点 x &lt; 16px、右移 ≥ 60px 打开抽屉</text>
+    <text x="84" y="872" font-size="10.2" fill="#4E6478">鼠标模式下上下滑只移光标，不发滚轮</text>
+
+    <rect x="428" y="760" width="344" height="132" rx="14" fill="#0B1118" stroke="#16232E" stroke-width="1"/>
+    <text x="448" y="786" font-size="11.5" font-weight="600" letter-spacing="0.6" fill="#8FA6B8">触觉反馈</text>
+    <text x="448" y="812" font-size="10.2" fill="#4E6478">振动开：滚动 / 左键 / 右键 各给 40 ms 短震</text>
+    <text x="448" y="832" font-size="10.2" fill="#4E6478">开启时状态条电量左侧常驻一个振动小图标</text>
+    <text x="448" y="852" font-size="10.2" fill="#4E6478">关闭后图标消失，完全静默</text>
+    <text x="448" y="872" font-size="10.2" fill="#4E6478">硬件：AXP192 LDO3 → Core2 振动马达（只有开关）</text>
+
+    <rect x="792" y="760" width="344" height="132" rx="14" fill="#0B1118" stroke="#16232E" stroke-width="1"/>
+    <text x="812" y="786" font-size="11.5" font-weight="600" letter-spacing="0.6" fill="#8FA6B8">状态与降级</text>
+    <text x="812" y="812" font-size="10.2" fill="#4E6478">未连接：面板盖 NOT CONNECTED 水印，手势不发</text>
+    <text x="812" y="832" font-size="10.2" fill="#4E6478">鼠标灵敏度：1 屏幕像素 ≈ 1.2 个鼠标计数</text>
+    <text x="812" y="852" font-size="10.2" fill="#4E6478">空闲 3 秒后屏幕照旧降到 20% 亮度</text>
+    <text x="812" y="872" font-size="10.2" fill="#4E6478">振动 / 模式选择都写 NVS，重启保留</text>
+  </g>
+
+  <text x="64" y="918" font-size="10.5" fill="#2E4152">字体映射：小标签 Font0 6×8 · 正文 FreeSans9pt · 标题 FreeSans 12/18pt</text>
+  <text x="1136" y="918" font-size="10.5" fill="#2E4152" text-anchor="end">审阅通过后再动 src/main.cpp —— 本图仅原型</text>
+</svg>
