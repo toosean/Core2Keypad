@@ -223,16 +223,6 @@ $ev = @([C2MouseHook]::Events)
 $dragOk = ($ev -contains 'LBUTTON_DOWN') -and ($ev -contains 'MOVE') -and ($ev -contains 'LBUTTON_UP')
 Check '按住后拖动 → 左键拖拽' $dragOk ($ev -join ', ')
 
-# --- 5c. 双指上下滑 -> 滚轮 ---
-Take
-Cmd 'C2_T2 1 120 100 200 100' 90 | Out-Null
-Cmd 'C2_T2 1 120 160 200 160' 90 | Out-Null
-Cmd 'C2_T2 1 120 220 200 220' 90 | Out-Null
-Cmd 'C2_T2 0 120 220 200 220' 250 | Out-Null
-$ev = @([C2MouseHook]::Events)
-$wheels = @($ev | Where-Object { $_ -eq 'WHEEL 120' }).Count
-Check '双指下滑 → 滚动向上' ($wheels -ge 3) "WHEEL +120 x$wheels"
-
 # --- 6. 左缘右滑 -> 抽屉 ---
 Take
 Cmd 'C2_T 1 5 120' 40 | Out-Null

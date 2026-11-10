@@ -294,7 +294,7 @@
     <text x="84" y="812" font-size="10.2" fill="#4E6478">上下滑：纵向位移 ≥ 48px 且 |dy| &gt; |dx|</text>
     <text x="84" y="832" font-size="10.2" fill="#4E6478">滚动格数随位移增加：每 24px 加 1 格，上限 12</text>
     <text x="84" y="852" font-size="10.2" fill="#4E6478">左缘右滑：起点 x &lt; 16px、右移 ≥ 60px 打开抽屉</text>
-    <text x="84" y="872" font-size="10.2" fill="#4E6478">鼠标模式：双指上下滑 = 滚动；按住 0.3s 再拖 = 左键拖拽</text>
+    <text x="84" y="872" font-size="10.2" fill="#4E6478">鼠标模式：按住 0.3s 再拖 = 左键拖拽</text>
 
     <rect x="428" y="760" width="344" height="132" rx="14" fill="#0B1118" stroke="#16232E" stroke-width="1"/>
     <text x="448" y="786" font-size="11.5" font-weight="600" letter-spacing="0.6" fill="#8FA6B8">触觉反馈</text>
