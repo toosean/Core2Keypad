@@ -1106,6 +1106,12 @@ void loop()
     M5.update();
     const uint32_t now = millis();
 
+    // 侧边电源键：短按一下就立刻进入 deep sleep（长按仍交给 AXP 硬件关机）
+    if (M5.BtnPWR.wasClicked()) {
+        Serial.println("[PWR] power button -> deep sleep");
+        enterDeepSleep();
+    }
+
     // ---- 睡眠中：只等一次触摸把屏幕叫醒 ----
     if (g_asleep) {
         const bool injected = g_inject && (int32_t)(now - g_injUntil) < 0;
