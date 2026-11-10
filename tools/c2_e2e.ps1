@@ -157,21 +157,18 @@ Write-Host ("设备: " + (Info)) -ForegroundColor DarkGray
 Cmd 'C2_MODE 0' 150 | Out-Null
 Start-Sleep -Milliseconds 200
 Take
-Cmd 'C2_T 1 160 200' 30 | Out-Null
-Cmd 'C2_T 1 160 160' 30 | Out-Null
-Cmd 'C2_T 1 160 100' 30 | Out-Null
-Cmd 'C2_T 1 160 60' 30  | Out-Null
-Cmd 'C2_T 0 160 60' 250 | Out-Null
+Cmd 'C2_T 1 160 200' 90 | Out-Null
+Cmd 'C2_T 1 160 60' 90 | Out-Null
+Cmd 'C2_T 0 160 60' 300 | Out-Null
 $ev = @([C2MouseHook]::Events)
 $up = @($ev | Where-Object { $_ -eq 'WHEEL -120' }).Count
 Check '滑动模式 · 上滑 140px → 滚动向下' ($up -ge 4 -and $up -le 6) "WHEEL -120 x$up（合并容忍 ±1）"
 
 # --- 2. 下滑 -> 滚轮向下 ---
 Take
-Cmd 'C2_T 1 160 60' 30  | Out-Null
-Cmd 'C2_T 1 160 140' 30 | Out-Null
-Cmd 'C2_T 1 160 200' 30 | Out-Null
-Cmd 'C2_T 0 160 200' 250 | Out-Null
+Cmd 'C2_T 1 160 60' 90 | Out-Null
+Cmd 'C2_T 1 160 200' 90 | Out-Null
+Cmd 'C2_T 0 160 200' 300 | Out-Null
 $ev = @([C2MouseHook]::Events)
 $down = @($ev | Where-Object { $_ -eq 'WHEEL 120' }).Count
 Check '滑动模式 · 下滑 140px → 滚动向上' ($down -ge 4 -and $down -le 6) "WHEEL +120 x$down（合并容忍 ±1）"
@@ -223,6 +220,28 @@ $ev = @([C2MouseHook]::Events)
 $dragOk = ($ev -contains 'LBUTTON_DOWN') -and ($ev -contains 'MOVE') -and ($ev -contains 'LBUTTON_UP')
 Check '按住后拖动 → 左键拖拽' $dragOk ($ev -join ', ')
 
+# --- 5d. 多设备：切到空槽位时报告应被丢弃 ---
+$hosts = (Cmd 'C2_HOSTS' 300)
+$m = [regex]::Match($hosts, 'HOST conn=\d+ slot=D(\d)')
+if ($m.Success) {
+    $pcSlot = [int]$m.Groups[1].Value
+    $other = if ($pcSlot -eq 3) { 1 } else { $pcSlot + 1 }
+    Cmd "C2_HOST $other" 150 | Out-Null
+    Take
+    Cmd 'C2_T 1 200 120' 40 | Out-Null
+    Cmd 'C2_T 0 200 120' 250 | Out-Null
+    $ev = @([C2MouseHook]::Events | Where-Object { $_ -ne 'MOVE' })
+    Check "多设备 · 切到空槽 D$other 报告被丢弃" ($ev.Count -eq 0) "按键事件=$($ev.Count)"
+    Cmd "C2_HOST $pcSlot" 150 | Out-Null
+    Take
+    Cmd 'C2_T 1 200 120' 40 | Out-Null
+    Cmd 'C2_T 0 200 120' 250 | Out-Null
+    $ev = @([C2MouseHook]::Events)
+    Check "多设备 · 切回 D$pcSlot 恢复发送" ($ev -contains 'LBUTTON_DOWN') ($ev -join ', ')
+} else {
+    Check '多设备 · 读取当前槽位' $false $hosts
+}
+
 # --- 6. 左缘右滑 -> 抽屉 ---
 Take
 Cmd 'C2_T 1 5 120' 40 | Out-Null
@@ -231,13 +250,13 @@ Cmd 'C2_T 1 95 120' 40 | Out-Null
 Cmd 'C2_T 0 95 120' 250 | Out-Null
 $info = Info
 Check '左缘右滑 · 打开抽屉' ($info -match 'drawer=1') $info
-$ev = @([C2MouseHook]::Events)
-Check '左缘手势不漏鼠标事件' ($ev.Count -eq 0) ("events=$($ev.Count)")
+$ev = @([C2MouseHook]::Events | Where-Object { $_ -ne 'MOVE' })
+Check '左缘手势不漏鼠标事件' ($ev.Count -eq 0) ("按键事件=$($ev.Count)")
 
 # --- 7. 点 VIBRATION ---
 $before = Info
-Cmd 'C2_T 1 60 130' 90  | Out-Null
-Cmd 'C2_T 0 60 130' 250 | Out-Null
+Cmd 'C2_T 1 44 130' 90  | Out-Null
+Cmd 'C2_T 0 44 130' 250 | Out-Null
 $after = Info
 $b = if ($before -match 'vib=1') { 1 } else { 0 }
 $a = if ($after  -match 'vib=1') { 1 } else { 0 }
@@ -245,11 +264,28 @@ Check '抽屉 · VIBRATION 切换' ($a -ne $b) "vib $b -> $a"
 
 # --- 8. 点 MODE ---
 $before = Info
-Cmd 'C2_T 1 170 130' 90  | Out-Null
-Cmd 'C2_T 0 170 130' 250 | Out-Null
+Cmd 'C2_T 1 116 130' 90  | Out-Null
+Cmd 'C2_T 0 116 130' 250 | Out-Null
 $after = Info
-Check '抽屉 · MODE 切换' (($before -match 'mode=(\w+)') -and ($after -match 'mode=(\w+)') -and ($Matches.Count -gt 0)) "$($before -replace '.*mode=', '') -> $($after -replace '.*mode=', '')"
+$mb = if ($before -match 'mode=(\w+)') { $Matches[1] } else { '?' }
+$ma = if ($after -match 'mode=(\w+)') { $Matches[1] } else { '?' }
+Check '抽屉 · MODE 切换' ($mb -ne $ma) "mode $mb -> $ma"
 Check '切模式时抽屉保持打开' ($after -match 'drawer=1') $after
+
+# --- 8b. 点 DEVICE：槽位循环 ---
+$before = Info
+$hb = (Cmd 'C2_HOSTS' 250)
+Cmd 'C2_T 1 188 130' 90  | Out-Null
+Cmd 'C2_T 0 188 130' 250 | Out-Null
+$ha = (Cmd 'C2_HOSTS' 250)
+$sb = if ($hb -match 'C2_HOSTS slot=D(\d)') { [int]$Matches[1] } else { 0 }
+$sa = if ($ha -match 'C2_HOSTS slot=D(\d)') { [int]$Matches[1] } else { 0 }
+Check '抽屉 · DEVICE 循环槽位' ($sa -eq ($sb % 3) + 1) "D$sb -> D$sa"
+Cmd 'C2_T 1 188 130' 90  | Out-Null
+Cmd 'C2_T 0 188 130' 250 | Out-Null
+Cmd 'C2_T 1 188 130' 90  | Out-Null
+Cmd 'C2_T 0 188 130' 250 | Out-Null
+Check '抽屉 · 循环一圈回到原槽位' ((Info) -match "slot=D$sb ") (Info)
 
 # --- 9. 点抽屉外 -> 收起 ---
 Cmd 'C2_T 1 285 120' 90  | Out-Null

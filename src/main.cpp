@@ -35,8 +35,9 @@ static constexpr int BAR_H   = 30;
 static constexpr int PANEL_X = 8, PANEL_Y = 40, PANEL_W = 304, PANEL_H = 192;
 
 static constexpr int DRAWER_W = 232, DRAWER_H = 184, DRAWER_Y = 44;
-static constexpr int TILE_W = 96, TILE_H = 106, TILE_Y = 82;
-static constexpr int TILE_A_X = 16, TILE_B_X = 124;
+static constexpr int TILE_W = 64, TILE_H = 106, TILE_Y = 82;
+static constexpr int TILE_X0 = 12, TILE_X1 = 84, TILE_X2 = 156;
+static constexpr int HOST_SLOTS = 3;          // BLE 控制器上限：同时 3 条连接
 
 // ---------------------------------------------------------------- 手势参数
 static constexpr int  EDGE_X      = 16;    // 左缘热区
@@ -84,6 +85,8 @@ static constexpr uint16_t C_CHEV_U  = rgb(0x31, 0x50, 0x6A);
 static constexpr uint16_t C_CHEV_D  = rgb(0x6E, 0x58, 0x28);
 static constexpr uint16_t C_DOT     = rgb(0x1C, 0x2D, 0x3A);
 static constexpr uint16_t C_OFF_IC  = rgb(0x3B, 0x52, 0x65);
+static constexpr uint16_t C_GREEN_D = rgb(0x0C, 0x21, 0x1C);
+static constexpr uint16_t C_DOT_OFF = rgb(0x2A, 0x3A, 0x46);
 
 static inline uint16_t dimc(uint16_t c) { return (uint16_t)((c >> 1) & 0x7BEF); }
 
@@ -186,6 +189,164 @@ static BLEHIDDevice      *g_hid    = nullptr;
 static BLECharacteristic *g_kb     = nullptr;
 static BLECharacteristic *g_ms     = nullptr;
 
+// ---------------------------------------------------------------- 多设备槽位
+// ESP32 的 BLE 控制器同时只支持 3 条连接，所以固定 3 个槽位；槽位按蓝牙地址
+// 记忆，切换只是把报告指向另一条 conn_id —— 不 disconnect，不影响其它连接。
+struct HostLink { bool used; uint16_t connId; uint8_t bda[6]; int8_t slot; };
+
+static esp_gatt_if_t g_gattsIf = ESP_GATT_IF_NONE;
+
+// BLEServer::getGattsIf() 是私有的，但 BLEDevice 支持再挂一个 handler（在原处理之后调用），
+// 用它把 gatts_if 记下来，定向发送时要用。
+static void onGattsEvent(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
+                         esp_ble_gatts_cb_param_t *param)
+{
+    (void)event; (void)param;
+    if (gatts_if != ESP_GATT_IF_NONE) g_gattsIf = gatts_if;
+}
+
+static HostLink g_links[HOST_SLOTS];
+static int8_t   g_hostSlot   = 0;        // 当前选中槽位 0..2，恒有值
+static uint16_t g_activeConn = 0xFFFF;   // 选中槽位对应的在线连接（没有则 0xFFFF）
+
+static int linkCount()
+{
+    int n = 0;
+    for (int i = 0; i < HOST_SLOTS; ++i) if (g_links[i].used) ++n;
+    return n;
+}
+
+static HostLink *linkByConn(uint16_t connId)
+{
+    for (int i = 0; i < HOST_SLOTS; ++i)
+        if (g_links[i].used && g_links[i].connId == connId) return &g_links[i];
+    return nullptr;
+}
+
+static bool slotOnline(int8_t slot)
+{
+    for (int i = 0; i < HOST_SLOTS; ++i)
+        if (g_links[i].used && g_links[i].slot == slot) return true;
+    return false;
+}
+
+static void slotKey(char *out, size_t n, const char *prefix, int8_t slot)
+{
+    snprintf(out, n, "%s%d", prefix, (int)slot);
+}
+
+static int8_t slotForBda(const uint8_t *bda)
+{
+    for (int8_t k = 0; k < HOST_SLOTS; ++k) {
+        char key[8]; slotKey(key, sizeof(key), "h", k);
+        uint8_t saved[6];
+        if (g_prefs.getBytesLength(key) == 6) {
+            g_prefs.getBytes(key, saved, 6);
+            if (!memcmp(saved, bda, 6)) return k;
+        }
+    }
+    return -1;
+}
+
+static void bindSlot(int8_t slot, const uint8_t *bda)
+{
+    char key[8]; slotKey(key, sizeof(key), "h", slot);
+    g_prefs.putBytes(key, bda, 6);
+    char tkey[8]; slotKey(tkey, sizeof(tkey), "t", slot);
+    g_prefs.putUInt(tkey, (uint32_t)(millis() / 1000));
+    Serial.printf("[HOST] slot %d <- %02X:%02X:%02X:%02X:%02X:%02X\n", (int)slot + 1,
+                  bda[0], bda[1], bda[2], bda[3], bda[4], bda[5]);
+}
+
+static int8_t pickSlot(const uint8_t *bda)
+{
+    const int8_t known = slotForBda(bda);
+    if (known >= 0) return known;
+    for (int8_t k = 0; k < HOST_SLOTS; ++k) {
+        char key[8]; slotKey(key, sizeof(key), "h", k);
+        if (g_prefs.getBytesLength(key) != 6) { bindSlot(k, bda); return k; }
+    }
+    // 三个槽都占着：淘汰「不在线且最久没用」的那个
+    int8_t victim = 0;
+    uint32_t oldest = 0xFFFFFFFFu;
+    for (int8_t k = 0; k < HOST_SLOTS; ++k) {
+        if (slotOnline(k)) continue;
+        char tkey[8]; slotKey(tkey, sizeof(tkey), "t", k);
+        const uint32_t ts = g_prefs.getUInt(tkey, 0);
+        if (ts < oldest) { oldest = ts; victim = k; }
+    }
+    bindSlot(victim, bda);
+    return victim;
+}
+
+static void refreshActive()
+{
+    g_activeConn = 0xFFFF;
+    g_connected = false;
+    for (int i = 0; i < HOST_SLOTS; ++i) {
+        if (!g_links[i].used) continue;
+        g_connected = true;
+        if (g_links[i].slot == g_hostSlot) g_activeConn = g_links[i].connId;
+    }
+}
+
+static void hostConnected(uint16_t connId, const uint8_t *bda)
+{
+    if (linkByConn(connId)) return;
+    const int8_t slot = pickSlot(bda);
+    for (int i = 0; i < HOST_SLOTS; ++i) {
+        if (g_links[i].used) continue;
+        g_links[i].used = true;
+        g_links[i].connId = connId;
+        g_links[i].slot = slot;
+        memcpy(g_links[i].bda, bda, 6);
+        break;
+    }
+    char tkey[8]; slotKey(tkey, sizeof(tkey), "t", slot);
+    g_prefs.putUInt(tkey, (uint32_t)(millis() / 1000));
+    refreshActive();
+    Serial.printf("[HOST] conn=%u slot=%d online=%d active=%d\n",
+                  (unsigned)connId, (int)slot + 1, linkCount(), g_activeConn != 0xFFFF ? 1 : 0);
+    requestRedraw();
+}
+
+static void hostDisconnected(uint16_t connId)
+{
+    HostLink *l = linkByConn(connId);
+    if (l) {
+        Serial.printf("[HOST] conn=%u slot=%d down\n", (unsigned)connId, (int)l->slot + 1);
+        l->used = false;
+        l->connId = 0;
+        l->slot = -1;
+    }
+    refreshActive();
+    requestRedraw();
+}
+
+static void cycleHost()
+{
+    markActivity();
+    g_hostSlot = (int8_t)((g_hostSlot + 1) % HOST_SLOTS);
+    g_prefs.putUChar("host", (uint8_t)g_hostSlot);
+    refreshActive();
+    Serial.printf("[HOST] select slot=%d online=%d active=%d\n",
+                  (int)g_hostSlot + 1, slotOnline(g_hostSlot) ? 1 : 0,
+                  g_activeConn != 0xFFFF ? 1 : 0);
+    requestRedraw();
+}
+
+static void selectHost(int8_t slot)
+{
+    if (slot < 0 || slot >= HOST_SLOTS) return;
+    g_hostSlot = slot;
+    g_prefs.putUChar("host", (uint8_t)g_hostSlot);
+    refreshActive();
+    Serial.printf("[HOST] select slot=%d online=%d active=%d\n",
+                  (int)g_hostSlot + 1, slotOnline(g_hostSlot) ? 1 : 0,
+                  g_activeConn != 0xFFFF ? 1 : 0);
+    requestRedraw();
+}
+
 class SecCB : public BLESecurityCallbacks {
     uint32_t onPassKeyRequest() override { return 123456; }
     void     onPassKeyNotify(uint32_t) override {}
@@ -235,27 +396,27 @@ public:
 static void cccdRestore();
 
 class ServerCB : public BLEServerCallbacks {
-    void onConnect(BLEServer *) override {
-        g_connected = true;
-        g_advPending = false;
-        Serial.println("[BLE] connected");
+    void onConnect(BLEServer *, esp_ble_gatts_cb_param_t *param) override {
+        hostConnected(param->connect.conn_id, param->connect.remote_bda);
         cccdRestore();
+        Serial.printf("[BLE] connected conn=%u online=%d\n",
+                      (unsigned)param->connect.conn_id, linkCount());
+        // 连接后继续广播，好让第二、三台连进来
+        g_advPending = true;
+        g_advAt = millis() + 250;
         requestRedraw();
     }
-    void onDisconnect(BLEServer *srv) override {
-        (void)srv;
-        g_connected = false;
-        Serial.println("[BLE] disconnected");
+    // 断开原因：0x08 超时 / 0x13 0x16 主机主动断 / 0x3E 建链失败
+    void onDisconnect(BLEServer *, esp_ble_gatts_cb_param_t *param) override {
+        hostDisconnected(param->disconnect.conn_id);
+        Serial.printf("[BLE] disconnected conn=%u reason=0x%02X online=%d\n",
+                      (unsigned)param->disconnect.conn_id, param->disconnect.reason, linkCount());
         // 不要在回调里立刻开广播：协议栈还没拆完链路，startAdvertising 经常静默失败，
         // 结果就是「主机再也连不上，直到复位」。交回 loop 延迟重开，并带重试。
         g_advPending = true;
         g_advAt = millis() + 250;
         g_advRetryAt = millis() + 10000;
         requestRedraw();
-    }
-    // 断开原因：0x08 超时 / 0x13 0x16 主机主动断 / 0x3E 建链失败
-    void onDisconnect(BLEServer *, esp_ble_gatts_cb_param_t *param) override {
-        Serial.printf("[BLE] reason=0x%02X\n", param->disconnect.reason);
     }
 };
 
@@ -317,6 +478,7 @@ static const uint8_t kReportMap[] = {
 static void bleInit()
 {
     BLEDevice::init("Core2 Keypad");
+    BLEDevice::setCustomGattsHandler(onGattsEvent);
     g_server = BLEDevice::createServer();
     g_server->setCallbacks(new ServerCB());
     BLEDevice::setSecurityCallbacks(new SecCB());
@@ -356,12 +518,14 @@ static void bleInit()
 
 // ---------------------------------------------------------------- HID 发送
 // 报告值不带 Report ID 前缀（主机栈把特征值整体当报告本体）。
+// 只发给当前槽位那条连接：BLECharacteristic::notify() 会广播给所有 peer，
+// 多设备下必须直接按 conn_id 发。
 static void sendMouse(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel)
 {
-    if (!g_connected || !g_ms) return;
+    if (g_activeConn == 0xFFFF || !g_ms || !g_server) return;
     uint8_t buf[4] = { buttons, (uint8_t)dx, (uint8_t)dy, (uint8_t)wheel };
-    g_ms->setValue(buf, 4);
-    g_ms->notify();
+    if (g_gattsIf == ESP_GATT_IF_NONE) return;
+    esp_ble_gatts_send_indicate(g_gattsIf, g_activeConn, g_ms->getHandle(), 4, buf, false);
 }
 
 
@@ -446,13 +610,13 @@ static void onRelease(int x, int y, uint32_t now)
 
     if (g_drawer) {
         if (x >= DRAWER_W || y < DRAWER_Y || y > DRAWER_Y + DRAWER_H) { closeDrawer(); return; }
-        if (x >= TILE_A_X && x < TILE_A_X + TILE_W && y >= TILE_Y && y < TILE_Y + TILE_H) {
-            toggleVib();
-            return;
-        }
-        if (x >= TILE_B_X && x < TILE_B_X + TILE_W && y >= TILE_Y && y < TILE_Y + TILE_H) {
-            setMode(g_mode == MODE_SLIDE ? MODE_MOUSE : MODE_SLIDE);
-            return;
+        if (y >= TILE_Y && y < TILE_Y + TILE_H) {
+            if (x >= TILE_X0 && x < TILE_X0 + TILE_W) { toggleVib(); return; }
+            if (x >= TILE_X1 && x < TILE_X1 + TILE_W) {
+                setMode(g_mode == MODE_SLIDE ? MODE_MOUSE : MODE_SLIDE);
+                return;
+            }
+            if (x >= TILE_X2 && x < TILE_X2 + TILE_W) { cycleHost(); return; }
         }
         return;
     }
@@ -613,10 +777,18 @@ static void drawStatusBar(bool dim, uint32_t now)
     canvas.setTextColor(dim ? dimc(acc) : acc);
     canvas.drawString(kModeName[g_mode], 127, 15);
 
-    canvas.fillCircle(168, 15, 3, g_connected ? (dim ? dimc(C_GREEN) : C_GREEN) : C_DIM);
+    // 永远显示当前槽位 + 状态：绿 = 该槽在线 / 琥珀 = 该槽离线但还有别的在线 / 灰 = 一台都没有
+    const bool curLive = slotOnline(g_hostSlot);
+    uint16_t dotCol, slotCol;
+    if (curLive)        { dotCol = C_GREEN;  slotCol = C_GREEN_T; }
+    else if (g_connected) { dotCol = C_AMBER;  slotCol = C_AMBER_L; }
+    else                { dotCol = C_DOT_OFF; slotCol = C_HEAD; }
+    canvas.fillCircle(168, 15, 3, dim ? dimc(dotCol) : dotCol);
     canvas.setTextDatum(textdatum_t::top_left);
-    canvas.setTextColor(g_connected ? (dim ? dimc(C_GREEN_T) : C_GREEN_T) : C_DIM);
-    canvas.drawString(g_connected ? "CONNECTED" : "WAITING", 176, 11);
+    canvas.setTextColor(dim ? dimc(slotCol) : slotCol);
+    char slotLab[6];
+    snprintf(slotLab, sizeof(slotLab), "D%d", (int)g_hostSlot + 1);
+    canvas.drawString(slotLab, 176, 11);
 
     if (g_vib) drawVibGlyphSmall(272, 15, dim ? dimc(C_BLUE_L) : C_BLUE_L);
 
@@ -734,26 +906,25 @@ static void drawDrawer()
     canvas.setTextColor(C_HEAD);
     canvas.drawString("TOOLS", 20, 62);
 
-    // 振动块
-    const int acx = TILE_A_X + TILE_W / 2;
-    canvas.fillRoundRect(TILE_A_X, TILE_Y, TILE_W, TILE_H, 18, g_vib ? C_BLUE_D : C_TILE);
-    canvas.drawRoundRect(TILE_A_X, TILE_Y, TILE_W, TILE_H, 18, g_vib ? C_BLUE : C_LINE);
+    // ---- 振动 ----
+    const int acx = TILE_X0 + TILE_W / 2;
+    canvas.fillRoundRect(TILE_X0, TILE_Y, TILE_W, TILE_H, 16, g_vib ? C_BLUE_D : C_TILE);
+    canvas.drawRoundRect(TILE_X0, TILE_Y, TILE_W, TILE_H, 16, g_vib ? C_BLUE : C_LINE);
     drawVibGlyph(acx, TILE_Y + 32, g_vib ? C_BLUE_L : C_OFF_IC);
     canvas.setFont(&fonts::Font0);
     canvas.setTextDatum(textdatum_t::middle_center);
     canvas.setTextColor(g_vib ? C_TEXT : rgb(0x6E, 0x86, 0x99));
     canvas.drawString("VIBRATION", acx, TILE_Y + 68);
-    canvas.setFont(&fonts::Font0);
     canvas.setTextColor(g_vib ? C_BLUE_L : rgb(0x3E, 0x55, 0x68));
     canvas.drawString(g_vib ? "ON" : "OFF", acx, TILE_Y + 88);
 
-    // 模式块
+    // ---- 模式 ----
     const bool mouse = (g_mode == MODE_MOUSE);
     const uint16_t macc = mouse ? C_AMBER : C_BLUE;
-    const int bcx = TILE_B_X + TILE_W / 2;
+    const int bcx = TILE_X1 + TILE_W / 2;
     const int bcy = TILE_Y + 32;
-    canvas.fillRoundRect(TILE_B_X, TILE_Y, TILE_W, TILE_H, 18, mouse ? C_AMBER_D : C_TILE_M);
-    canvas.drawRoundRect(TILE_B_X, TILE_Y, TILE_W, TILE_H, 18, mouse ? C_AMBER : C_LINE);
+    canvas.fillRoundRect(TILE_X1, TILE_Y, TILE_W, TILE_H, 16, mouse ? C_AMBER_D : C_TILE_M);
+    canvas.drawRoundRect(TILE_X1, TILE_Y, TILE_W, TILE_H, 16, mouse ? C_AMBER : C_LINE);
     if (mouse) {
         canvas.drawRoundRect(bcx - 15, bcy - 11, 30, 22, 7, macc);
         canvas.fillCircle(bcx, bcy, 3, macc);
@@ -767,9 +938,30 @@ static void drawDrawer()
     canvas.setTextDatum(textdatum_t::middle_center);
     canvas.setTextColor(mouse ? C_TEXT : rgb(0xC9, 0xD8, 0xE6));
     canvas.drawString("MODE", bcx, TILE_Y + 68);
-    canvas.setFont(&fonts::Font0);
     canvas.setTextColor(mouse ? C_AMBER_L : C_BLUE_L);
     canvas.drawString(kModeName[g_mode], bcx, TILE_Y + 88);
+
+    // ---- 设备：点一下在 3 个槽位间循环 ----
+    const bool live = slotOnline(g_hostSlot);
+    const int ccx = TILE_X2 + TILE_W / 2;
+    const int ccy = TILE_Y + 32;
+    canvas.fillRoundRect(TILE_X2, TILE_Y, TILE_W, TILE_H, 16, live ? C_GREEN_D : C_TILE);
+    canvas.drawRoundRect(TILE_X2, TILE_Y, TILE_W, TILE_H, 16, live ? C_GREEN : C_LINE);
+    const uint16_t dc = live ? C_GREEN_T : C_OFF_IC;
+    canvas.drawWideLine(ccx - 9, ccy - 5, ccx + 7, ccy - 5, 1.3f, dc);      // 上行箭头
+    canvas.drawWideLine(ccx + 7, ccy - 5, ccx + 2, ccy - 10, 1.3f, dc);
+    canvas.drawWideLine(ccx + 7, ccy - 5, ccx + 2, ccy, 1.3f, dc);
+    canvas.drawWideLine(ccx + 9, ccy + 5, ccx - 7, ccy + 5, 1.3f, dc);      // 下行箭头
+    canvas.drawWideLine(ccx - 7, ccy + 5, ccx - 2, ccy, 1.3f, dc);
+    canvas.drawWideLine(ccx - 7, ccy + 5, ccx - 2, ccy + 10, 1.3f, dc);
+    canvas.setFont(&fonts::Font0);
+    canvas.setTextDatum(textdatum_t::middle_center);
+    canvas.setTextColor(live ? C_TEXT : rgb(0x6E, 0x86, 0x99));
+    canvas.drawString("DEVICE", ccx, TILE_Y + 68);
+    char dlab[6];
+    snprintf(dlab, sizeof(dlab), "D%d", (int)g_hostSlot + 1);
+    canvas.setTextColor(live ? C_GREEN_T : rgb(0x3E, 0x55, 0x68));
+    canvas.drawString(dlab, ccx, TILE_Y + 88);
 
     canvas.setTextDatum(textdatum_t::top_left);
     canvas.setTextColor(rgb(0x33, 0x47, 0x5A));
@@ -867,10 +1059,12 @@ static void enterDeepSleep()
     Serial.println("[PWR] deep sleep, wake by touch (GPIO39 low)");
     Serial.flush();
 
-    // 干净地断开，别让主机停在“已连接”的假状态
-    if (g_connected && g_server) {
-        g_server->disconnect(g_server->getConnId());
-        delay(200);
+    // 干净地断开所有连接，别让主机停在“已连接”的假状态
+    for (int i = 0; i < HOST_SLOTS; ++i) {
+        if (g_links[i].used && g_server) {
+            g_server->disconnect(g_links[i].connId);
+            delay(150);
+        }
     }
     M5.Display.setBrightness(0);
     M5.Display.sleep();
@@ -970,8 +1164,10 @@ static void handleSerial()
             if (command == "C2_SCREEN") {
                 captureBegin();
             } else if (command == "C2_INFO") {
-                Serial.printf("C2_INFO core2keypad-2.0 %dx%d mode=%s vib=%d connected=%d drawer=%d notches=%d asleep=%d pressed=%d held=%lu up=%lus boot=%u heap=%u\n",
+                Serial.printf("C2_INFO core2keypad-2.0 %dx%d mode=%s vib=%d conn=%d slot=D%d links=%d live=%d drawer=%d notches=%d asleep=%d pressed=%d held=%lu up=%lus boot=%u heap=%u\n",
                               W, H, kModeName[g_mode], g_vib ? 1 : 0, g_connected ? 1 : 0,
+                              (int)g_hostSlot + 1, linkCount(),
+                              g_activeConn != 0xFFFF ? 1 : 0,
                               g_drawer ? 1 : 0, g_notches, g_asleep ? 1 : 0, g_pressed ? 1 : 0, (unsigned long)(g_pressed ? (millis() - g_t0) : 0), (unsigned long)(millis() / 1000), (unsigned)g_boots, (unsigned)ESP.getFreeHeap());
             } else if (command == "C2_BLE") {
                 BLEService *hid = g_server ? g_server->getServiceByUUID(BLEUUID((uint16_t)0x1812)) : nullptr;
@@ -1005,11 +1201,32 @@ static void handleSerial()
                     Serial.println("C2_ERROR bad_value");
                 }
             } else if (command == "C2_DISC") {
-                if (g_connected) {
-                    g_server->disconnect(g_server->getConnId());
+                if (g_activeConn != 0xFFFF) {
+                    g_server->disconnect(g_activeConn);
                     Serial.println("C2_DISC sent");
                 } else {
                     Serial.println("C2_DISC not_connected");
+                }
+            } else if (command == "C2_HOSTS") {
+                Serial.printf("C2_HOSTS slot=D%d links=%d live=%d connected=%d\n",
+                              (int)g_hostSlot + 1, linkCount(),
+                              g_activeConn != 0xFFFF ? 1 : 0, g_connected ? 1 : 0);
+                for (int i = 0; i < HOST_SLOTS; ++i) {
+                    if (!g_links[i].used) continue;
+                    const uint8_t *b = g_links[i].bda;
+                    Serial.printf("  HOST conn=%u slot=D%d bda=%02X:%02X:%02X:%02X:%02X:%02X%s\n",
+                                  (unsigned)g_links[i].connId, (int)g_links[i].slot + 1,
+                                  b[0], b[1], b[2], b[3], b[4], b[5],
+                                  (g_links[i].connId == g_activeConn) ? " *" : "");
+                }
+            } else if (command.startsWith("C2_HOST ")) {
+                int n = -1;
+                if (sscanf(command.c_str(), "C2_HOST %d", &n) == 1 && n >= 1 && n <= HOST_SLOTS) {
+                    selectHost((int8_t)(n - 1));
+                    Serial.printf("C2_HOST D%d online=%d\n",
+                                  (int)g_hostSlot + 1, slotOnline(g_hostSlot) ? 1 : 0);
+                } else {
+                    Serial.println("C2_ERROR bad_host");
                 }
             } else if (command == "C2_SLEEP") {
                 enterSleep(millis() + SLEEP_MS);      // 第一段：关屏降频
@@ -1078,6 +1295,13 @@ void setup()
     g_prefs.begin("keypad", false);
     g_boots = (uint16_t)(g_prefs.getUShort("boots", 0) + 1);
     g_prefs.putUShort("boots", g_boots);
+    g_hostSlot = (int8_t)g_prefs.getUChar("host", 0);
+    if (g_hostSlot >= HOST_SLOTS || g_hostSlot < 0) g_hostSlot = 0;
+    for (int i = 0; i < HOST_SLOTS; ++i) {
+        g_links[i].used = false;
+        g_links[i].connId = 0;
+        g_links[i].slot = -1;
+    }
     g_mode = g_prefs.getUChar("mode", MODE_SLIDE);
     if (g_mode >= MODE_COUNT) g_mode = MODE_SLIDE;
     g_vib = g_prefs.getUChar("vib", 1) != 0;

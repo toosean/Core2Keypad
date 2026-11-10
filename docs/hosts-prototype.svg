@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Core2Keypad 多设备切换 UI 原型（审阅稿）。320x240 1:1，屏幕文字保持 ASCII。 -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="880" height="860" viewBox="0 0 880 860"
+     font-family="'Segoe UI','Microsoft YaHei','PingFang SC','Noto Sans SC',system-ui,sans-serif">
+  <defs>
+    <clipPath id="frameClip"><rect width="320" height="240" rx="10"/></clipPath>
+    <filter id="frameShadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+    <filter id="cardShadow" x="-40%" y="-30%" width="180%" height="180%">
+      <feDropShadow dx="6" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <rect width="880" height="860" fill="#06090D"/>
+  <text x="64" y="56" font-size="24" letter-spacing="0" fill="#E8F2FF" text-anchor="start" font-weight="700">CORE2 PANEL — 多设备切换 UI 原型</text>
+  <text x="64" y="82" font-size="11.5" letter-spacing="0" fill="#6E8699" text-anchor="start">抽屉在 MODE 右侧新增 DEVICE 按钮；每点一下在 D1 / D2 / D3 之间循环，只有被选中的那台收到鼠标消息</text>
+  <text x="64" y="102" font-size="11" letter-spacing="0" fill="#3C5163" text-anchor="start">3 个槽位（按蓝牙地址记忆）· 最多 3 台同时在线 · 循环切换只改路由，不断开任何连接</text>
+
+  <g transform="translate(64,120)">
+<rect x="0" y="0" width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
+<g clip-path="url(#frameClip)">
+<rect x="0" y="0" width="320" height="240" rx="10" fill="#0A0F15"/>
+<text x="14" y="19" font-size="9" letter-spacing="1.8" fill="#54677A" text-anchor="start">CORE2 PANEL</text>
+<rect x="100" y="7" width="54" height="17" rx="8.5" fill="#102A38" stroke="#38BDF8" stroke-width="0.9"/>
+<text x="127" y="19" font-size="7.6" letter-spacing="1" fill="#38BDF8" text-anchor="middle" font-weight="600">SLIDE</text>
+<circle cx="168" cy="15.5" r="3.2" fill="#34D399"/>
+<text x="176" y="18.4" font-size="8.2" letter-spacing="1.1" fill="#5FCFA6" text-anchor="start">D1</text>
+<rect x="271" y="10" width="2" height="10" rx="1" fill="#7DD3FC"/><path d="M276 12 q2 3 0 6" fill="none" stroke="#7DD3FC" stroke-width="1.3" stroke-linecap="round"/><path d="M268 12 q-2 3 0 6" fill="none" stroke="#7DD3FC" stroke-width="1.3" stroke-linecap="round"/>
+<text x="306" y="18.4" font-size="8.2" letter-spacing="0.6" fill="#4A6379" text-anchor="end">86%</text>
+<line x1="0" y1="30" x2="320" y2="30" stroke="#16232E"/><rect x="8" y="40" width="304" height="192" rx="18" fill="#0F1922" stroke="#1B2C3A" stroke-width="1"/><path d="M146 100 L160 86 L174 100" fill="none" stroke="#31506A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M146 186 L160 200 L174 186" fill="none" stroke="#6E5828" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="160" y="133" font-size="11.5" letter-spacing="1.4" fill="#7C93A6" text-anchor="middle">SWIPE UP / DOWN</text>
+<text x="160" y="151" font-size="8" letter-spacing="3" fill="#3A5164" text-anchor="middle">SCROLL</text><rect x="0" y="102" width="6" height="36" rx="3" fill="#15222D"/><rect x="2" y="110" width="2" height="20" rx="1" fill="#2F4B60"/>
+</g>
+<rect x="0" y="0" width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
+</g>
+  <text x="64" y="386" font-size="12" letter-spacing="0.2" fill="#7C94A8" text-anchor="start">① 主面板 · 状态条 ● D1（当前槽位 1 在线）</text>
+  <g transform="translate(496,120)">
+<rect x="0" y="0" width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
+<g clip-path="url(#frameClip)">
+<rect x="0" y="0" width="320" height="240" rx="10" fill="#0A0F15"/>
+<text x="14" y="19" font-size="9" letter-spacing="1.8" fill="#54677A" text-anchor="start">CORE2 PANEL</text>
+<rect x="100" y="7" width="54" height="17" rx="8.5" fill="#102A38" stroke="#38BDF8" stroke-width="0.9"/>
+<text x="127" y="19" font-size="7.6" letter-spacing="1" fill="#38BDF8" text-anchor="middle" font-weight="600">SLIDE</text>
+<circle cx="168" cy="15.5" r="3.2" fill="#34D399"/>
+<text x="176" y="18.4" font-size="8.2" letter-spacing="1.1" fill="#5FCFA6" text-anchor="start">D1</text>
+<rect x="271" y="10" width="2" height="10" rx="1" fill="#7DD3FC"/><path d="M276 12 q2 3 0 6" fill="none" stroke="#7DD3FC" stroke-width="1.3" stroke-linecap="round"/><path d="M268 12 q-2 3 0 6" fill="none" stroke="#7DD3FC" stroke-width="1.3" stroke-linecap="round"/>
+<text x="306" y="18.4" font-size="8.2" letter-spacing="0.6" fill="#4A6379" text-anchor="end">86%</text>
+<line x1="0" y1="30" x2="320" y2="30" stroke="#16232E"/><rect x="8" y="40" width="304" height="192" rx="18" fill="#0B121A" stroke="#16232E" stroke-width="1"/><rect x="0" y="0" width="320" height="240" rx="0" fill="#04070B" opacity="0.72"/><rect x="-18" y="44" width="250" height="184" rx="18" fill="#0F1A24" stroke="#22303D" stroke-width="1"/>
+<text x="20" y="62" font-size="8.6" letter-spacing="2.4" fill="#54677A" text-anchor="start">TOOLS</text>
+<rect x="12" y="82" width="64" height="106" rx="16" fill="#102A38" stroke="#38BDF8" stroke-width="1"/>
+<rect x="42" y="104" width="4.4" height="20" rx="2" fill="#38BDF8"/><path d="M55 105 q3.4 9 0 18" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/><path d="M33 105 q-3.4 9 0 18" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+<text x="44" y="148" font-size="7.2" letter-spacing="0.2" fill="#E8F2FF" text-anchor="middle" font-weight="600">VIBRATION</text>
+<text x="44" y="168" font-size="7.4" letter-spacing="1.0" fill="#38BDF8" text-anchor="middle">ON</text>
+<rect x="84" y="82" width="64" height="106" rx="16" fill="#102A38" stroke="#38BDF8" stroke-width="1"/>
+<path d="M108 110 L116 102 L124 110" fill="none" stroke="#38BDF8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M108 118 L116 126 L124 118" fill="none" stroke="#38BDF8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="116" y="148" font-size="7.2" letter-spacing="0.2" fill="#E8F2FF" text-anchor="middle" font-weight="600">MODE</text>
+<text x="116" y="168" font-size="7.4" letter-spacing="1.0" fill="#38BDF8" text-anchor="middle">SLIDE</text>
+<rect x="156" y="82" width="64" height="106" rx="16" fill="#0C211C" stroke="#34D399" stroke-width="1"/>
+<rect x="177" y="105" width="22" height="3" rx="1.5" fill="#34D399"/><rect x="177" y="112" width="16" height="3" rx="1.5" fill="#34D399"/><rect x="177" y="119" width="10" height="3" rx="1.5" fill="#34D399"/><circle cx="197" cy="120.5" r="2.2" fill="#34D399"/>
+<text x="188" y="148" font-size="7.2" letter-spacing="0.2" fill="#E8F2FF" text-anchor="middle" font-weight="600">DEVICE</text>
+<text x="188" y="168" font-size="7.4" letter-spacing="1.0" fill="#34D399" text-anchor="middle">D1</text>
+<text x="20" y="206" font-size="7.2" letter-spacing="1.4" fill="#33475A" text-anchor="start">TAP A TILE TO TOGGLE</text>
+</g>
+<rect x="0" y="0" width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
+</g>
+  <text x="496" y="386" font-size="12" letter-spacing="0.2" fill="#7C94A8" text-anchor="start">② 抽屉 · DEVICE 显示 D1，绿色 = 该槽位在线</text>
+  <g transform="translate(64,410)">
+<rect x="0" y="0" width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
+<g clip-path="url(#frameClip)">
+<rect x="0" y="0" width="320" height="240" rx="10" fill="#0A0F15"/>
+<text x="14" y="19" font-size="9" letter-spacing="1.8" fill="#54677A" text-anchor="start">CORE2 PANEL</text>
+<rect x="100" y="7" width="54" height="17" rx="8.5" fill="#102A38" stroke="#38BDF8" stroke-width="0.9"/>
+<text x="127" y="19" font-size="7.6" letter-spacing="1" fill="#38BDF8" text-anchor="middle" font-weight="600">SLIDE</text>
+<circle cx="168" cy="15.5" r="3.2" fill="#FBBF24"/>
+<text x="176" y="18.4" font-size="8.2" letter-spacing="1.1" fill="#FCD34D" text-anchor="start">D3</text>
+<rect x="271" y="10" width="2" height="10" rx="1" fill="#7DD3FC"/><path d="M276 12 q2 3 0 6" fill="none" stroke="#7DD3FC" stroke-width="1.3" stroke-linecap="round"/><path d="M268 12 q-2 3 0 6" fill="none" stroke="#7DD3FC" stroke-width="1.3" stroke-linecap="round"/>
+<text x="306" y="18.4" font-size="8.2" letter-spacing="0.6" fill="#4A6379" text-anchor="end">86%</text>
+<line x1="0" y1="30" x2="320" y2="30" stroke="#16232E"/><rect x="8" y="40" width="304" height="192" rx="18" fill="#0B121A" stroke="#16232E" stroke-width="1"/><rect x="0" y="0" width="320" height="240" rx="0" fill="#04070B" opacity="0.72"/><rect x="-18" y="44" width="250" height="184" rx="18" fill="#0F1A24" stroke="#22303D" stroke-width="1"/>
+<text x="20" y="62" font-size="8.6" letter-spacing="2.4" fill="#54677A" text-anchor="start">TOOLS</text>
+<rect x="12" y="82" width="64" height="106" rx="16" fill="#102A38" stroke="#38BDF8" stroke-width="1"/>
+<rect x="42" y="104" width="4.4" height="20" rx="2" fill="#38BDF8"/><path d="M55 105 q3.4 9 0 18" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/><path d="M33 105 q-3.4 9 0 18" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+<text x="44" y="148" font-size="7.2" letter-spacing="0.2" fill="#E8F2FF" text-anchor="middle" font-weight="600">VIBRATION</text>
+<text x="44" y="168" font-size="7.4" letter-spacing="1.0" fill="#38BDF8" text-anchor="middle">ON</text>
+<rect x="84" y="82" width="64" height="106" rx="16" fill="#102A38" stroke="#38BDF8" stroke-width="1"/>
+<path d="M108 110 L116 102 L124 110" fill="none" stroke="#38BDF8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M108 118 L116 126 L124 118" fill="none" stroke="#38BDF8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="116" y="148" font-size="7.2" letter-spacing="0.2" fill="#E8F2FF" text-anchor="middle" font-weight="600">MODE</text>
+<text x="116" y="168" font-size="7.4" letter-spacing="1.0" fill="#38BDF8" text-anchor="middle">SLIDE</text>
+<rect x="156" y="82" width="64" height="106" rx="16" fill="#0C1520" stroke="#1B2C3A" stroke-width="1"/>
+<rect x="177" y="105" width="22" height="3" rx="1.5" fill="#3A5164"/><rect x="177" y="112" width="16" height="3" rx="1.5" fill="#3A5164"/><rect x="177" y="119" width="10" height="3" rx="1.5" fill="#3A5164"/><circle cx="197" cy="120.5" r="2.2" fill="#3A5164"/>
+<text x="188" y="148" font-size="7.2" letter-spacing="0.2" fill="#6E8699" text-anchor="middle" font-weight="600">DEVICE</text>
+<text x="188" y="168" font-size="7.4" letter-spacing="1.0" fill="#3E5568" text-anchor="middle">D3</text>
+<text x="20" y="206" font-size="7.2" letter-spacing="1.4" fill="#33475A" text-anchor="start">TAP A TILE TO TOGGLE</text>
+</g>
+<rect x="0" y="0" width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
+</g>
+  <text x="64" y="676" font-size="12" letter-spacing="0.2" fill="#7C94A8" text-anchor="start">③ 循环到 D3 · 空槽，块变灰、状态条转琥珀</text>
+  <g transform="translate(496,410)">
+<rect x="0" y="0" width="320" height="240" rx="10" fill="#05080C" filter="url(#frameShadow)"/>
+<g clip-path="url(#frameClip)">
+<rect x="0" y="0" width="320" height="240" rx="10" fill="#0A0F15"/>
+<text x="14" y="19" font-size="9" letter-spacing="1.8" fill="#54677A" text-anchor="start">CORE2 PANEL</text>
+<rect x="100" y="7" width="54" height="17" rx="8.5" fill="#2A2110" stroke="#FBBF24" stroke-width="0.9"/>
+<text x="127" y="19" font-size="7.6" letter-spacing="1" fill="#FBBF24" text-anchor="middle" font-weight="600">MOUSE</text>
+<circle cx="168" cy="15.5" r="3.2" fill="#2A3A46"/>
+<text x="176" y="18.4" font-size="8.2" letter-spacing="1.1" fill="#54677A" text-anchor="start">D1</text>
+<rect x="271" y="10" width="2" height="10" rx="1" fill="#7DD3FC"/><path d="M276 12 q2 3 0 6" fill="none" stroke="#7DD3FC" stroke-width="1.3" stroke-linecap="round"/><path d="M268 12 q-2 3 0 6" fill="none" stroke="#7DD3FC" stroke-width="1.3" stroke-linecap="round"/>
+<text x="306" y="18.4" font-size="8.2" letter-spacing="0.6" fill="#4A6379" text-anchor="end">86%</text>
+<line x1="0" y1="30" x2="320" y2="30" stroke="#16232E"/><rect x="8" y="40" width="304" height="192" rx="18" fill="#0B121A" stroke="#16232E" stroke-width="1"/><rect x="0" y="0" width="320" height="240" rx="0" fill="#04070B" opacity="0.72"/><rect x="-18" y="44" width="250" height="184" rx="18" fill="#0F1A24" stroke="#22303D" stroke-width="1"/>
+<text x="20" y="62" font-size="8.6" letter-spacing="2.4" fill="#54677A" text-anchor="start">TOOLS</text>
+<rect x="12" y="82" width="64" height="106" rx="16" fill="#102A38" stroke="#38BDF8" stroke-width="1"/>
+<rect x="42" y="104" width="4.4" height="20" rx="2" fill="#38BDF8"/><path d="M55 105 q3.4 9 0 18" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/><path d="M33 105 q-3.4 9 0 18" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
+<text x="44" y="148" font-size="7.2" letter-spacing="0.2" fill="#E8F2FF" text-anchor="middle" font-weight="600">VIBRATION</text>
+<text x="44" y="168" font-size="7.4" letter-spacing="1.0" fill="#38BDF8" text-anchor="middle">ON</text>
+<rect x="84" y="82" width="64" height="106" rx="16" fill="#2A2110" stroke="#FBBF24" stroke-width="1"/>
+<path d="M108 110 L116 102 L124 110" fill="none" stroke="#FBBF24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M108 118 L116 126 L124 118" fill="none" stroke="#FBBF24" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="116" y="148" font-size="7.2" letter-spacing="0.2" fill="#E8F2FF" text-anchor="middle" font-weight="600">MODE</text>
+<text x="116" y="168" font-size="7.4" letter-spacing="1.0" fill="#FBBF24" text-anchor="middle">MOUSE</text>
+<rect x="156" y="82" width="64" height="106" rx="16" fill="#0C1520" stroke="#1B2C3A" stroke-width="1"/>
+<rect x="177" y="105" width="22" height="3" rx="1.5" fill="#3A5164"/><rect x="177" y="112" width="16" height="3" rx="1.5" fill="#3A5164"/><rect x="177" y="119" width="10" height="3" rx="1.5" fill="#3A5164"/><circle cx="197" cy="120.5" r="2.2" fill="#3A5164"/>
+<text x="188" y="148" font-size="7.2" letter-spacing="0.2" fill="#6E8699" text-anchor="middle" font-weight="600">DEVICE</text>
+<text x="188" y="168" font-size="7.4" letter-spacing="1.0" fill="#3E5568" text-anchor="middle">D1</text>
+<text x="20" y="206" font-size="7.2" letter-spacing="1.4" fill="#33475A" text-anchor="start">TAP A TILE TO TOGGLE</text>
+</g>
+<rect x="0" y="0" width="320" height="240" rx="10" fill="none" stroke="#22303D" stroke-width="1"/>
+</g>
+  <text x="496" y="676" font-size="12" letter-spacing="0.2" fill="#7C94A8" text-anchor="start">④ 一台都没连上 · DEVICE 与状态条都显示 D1（灰）</text>
+
+  <!-- 说明条 -->
+  <g>
+    <rect x="64" y="700" width="752" height="122" rx="14" fill="#0B1118" stroke="#16232E" stroke-width="1"/>
+    <text x="84" y="726" font-size="11.5" letter-spacing="0" fill="#8FA6B8" text-anchor="start" font-weight="600">DEVICE 块的两种状态</text>
+    <rect x="84" y="736" width="26" height="14" rx="4" fill="#0C211C" stroke="#34D399" stroke-width="1.1"/>
+    <text x="116" y="747" font-size="10" letter-spacing="0" fill="#4E6478" text-anchor="start">绿色点亮：当前槽位在线，消息发得出去</text>
+    <rect x="430" y="736" width="26" height="14" rx="4" fill="#0B121A" stroke="#16232E" stroke-width="1"/>
+    <text x="462" y="747" font-size="10" letter-spacing="0" fill="#4E6478" text-anchor="start">灰色：空槽或离线，消息静默丢弃</text>
+
+    <text x="84" y="776" font-size="11.5" letter-spacing="0" fill="#8FA6B8" text-anchor="start" font-weight="600">交互</text>
+    <text x="130" y="776" font-size="10" letter-spacing="0" fill="#4E6478" text-anchor="start">点 DEVICE：D1 → D2 → D3 → D1 循环；只改路由，不 disconnect；选中的设备断开后保持该槽并变灰，不自动跳走</text>
+
+    <text x="84" y="802" font-size="11.5" letter-spacing="0" fill="#8FA6B8" text-anchor="start" font-weight="600">细节</text>
+    <text x="130" y="802" font-size="10" letter-spacing="0" fill="#4E6478" text-anchor="start">槽位永远显示 D1/D2/D3（没配过就在 D1）；状态条恒显示 ● D1：绿 = 该槽在线、琥珀 = 该槽离线但还有别的在线、灰 = 一台都没连</text>
+  </g>
+  <text x="64" y="842" font-size="10" letter-spacing="0" fill="#2E4152" text-anchor="start">屏幕文字保持 ASCII（设备只有拉丁字库）；槽位数字 1..5，状态 CONNECTED / PAIRED / EMPTY</text>
+  <text x="816" y="842" font-size="10" letter-spacing="0" fill="#2E4152" text-anchor="end">审阅通过后再动 src/main.cpp —— 本图仅原型</text>
+</svg>
