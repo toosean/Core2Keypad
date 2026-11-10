@@ -1,177 +1,126 @@
 # Core2Keypad
 
-把 **M5Stack Core2** 变成一只蓝牙「手势面板」：整块屏幕就是手势区，没有按钮、没有滚动条、屏幕上也不画鼠标指针。
-两个模式，左侧抽屉里切换；还能同时挂 **3 台主机**，在抽屉里点一下切换发给谁。
+M5Stack Core2 as a Bluetooth trackpad: the whole screen is the input area, no physical buttons.
+Swipe up and down to scroll, press and drag to move the pointer; the left drawer switches modes,
+toggles haptics, and selects which of up to three connected hosts receives the input.
 
-![Core2Keypad 运行在 M5Stack Core2 上](docs/device.png)
+![Core2Keypad running on an M5Stack Core2](docs/device.png)
 
+[中文说明](README.zh-CN.md)
 
-| 模式 | 上下滑 | 单击 | 按住 500ms | 按住 ~0.3s 后拖动 |
+## Modes
+
+| Mode | Swipe up / down | Tap | Hold 500 ms | Hold ~0.3 s, then drag |
 | --- | --- | --- | --- | --- |
-| **SLIDE**（滑动） | 发滚轮：**下滑 = 向上滚，上滑 = 向下滚**（自然滚动，内容跟手） | — | — | — |
-| **MOUSE**（鼠标） | 移动光标 | 左键 | 右键 | **左键拖拽**（选中文字、拖窗口） |
+| **SLIDE** | wheel: swipe down scrolls up, swipe up scrolls down (natural scrolling) | — | — | — |
+| **MOUSE** | move the pointer | left click | right click | left-button drag (select text, move windows) |
 
-滚轮按位移换算：**每 24px 一格**，单次手势最多 12 格，边滑边发；滑完提示停留 3 秒后自动隐去。
-鼠标灵敏度：**1 屏幕像素 ≈ 1.2 个鼠标计数**。
+One wheel notch per 24 px of travel, at most 12 per swipe, sent while you move; the on-screen hint
+stays for 3 s after you stop. Pointer sensitivity: **1 screen pixel ≈ 1.2 mouse counts**.
 
-> 鼠标模式的「拖拽」和「移动光标」靠**按下后停顿**区分：按下去立刻划 = 只移光标；
-> 按住约 0.3 秒再划 = 左键按下并拖动，抬手松开。这样既保留悬停移动，又能做拖选。
+> Dragging and moving are told apart by a short pause: press and move straight away and the pointer
+> just moves; hold for about 0.3 s before moving and the left button is held down until you lift.
 
-## 工具栏
+## Toolbar
 
-从**屏幕左缘**（x < 16）向右滑 ≥ 60px，抽屉滑出：
+Swipe in from the left edge (x < 16, at least 60 px) to pull out the drawer:
 
-- **VIBRATION** — 振动开关，点亮 = 开
-- **MODE** — 模式切换，颜色跟着模式走（蓝 = 滑动，琥珀 = 鼠标）
-- **DEVICE** — 当前设备槽位 `D1/D2/D3`，点亮 = 该槽在线；**点一下在三个槽位间循环**
+- **VIBRATION** — haptics on/off, lit when on
+- **MODE** — SLIDE / MOUSE, the colour follows the mode (blue = slide, amber = mouse)
+- **DEVICE** — current host slot `D1/D2/D3`, lit when that slot is online; **tap to cycle**
 
-三个都是 64×106 的大块，整块可点；点块切换、点抽屉外收起。状态写 NVS，重启保留。
+Each tile is 64×106 and fully tappable; tap a tile to toggle, tap outside the drawer to close.
+Everything is stored in NVS and survives a reboot. With haptics on, a scroll, left click or right
+click gives a 40 ms buzz, and a small vibration icon sits to the left of the battery.
 
-振动开着时，滚动 / 左键 / 右键各给一次 40ms 短震；状态条电量左侧常驻一个振动小图标。
+## Multiple hosts (3 slots)
 
-## 多设备（3 个槽位）
+The ESP32 BLE controller supports **three simultaneous connections**
+(`CONFIG_BTDM_CTRL_BLE_MAX_CONN=3`), so there are exactly three slots:
 
-ESP32 的 BLE 控制器同时只支持 **3 条连接**（`CONFIG_BTDM_CTRL_BLE_MAX_CONN=3`），所以固定 3 个槽位：
+- slots are keyed by Bluetooth address in NVS, so the mapping and the selection survive reboots and deep sleep
+- `DEVICE` shows the current slot; **tapping cycles** D1 → D2 → D3 → D1
+- **only the selected slot receives reports**; the other connections stay up — switching never disconnects
+- the status bar always shows `● D<n>`: green = that slot is online, amber = that slot is offline but
+  another host is online, grey = nothing is connected
+- an empty or offline slot silently drops reports and never jumps to another device on its own
+- a second or third host takes a free slot; when all three are taken, the least recently used offline slot is evicted
 
-- 槽位按**蓝牙地址**记忆（NVS），重启 / 深睡唤醒后不丢；
-- 抽屉里 `DEVICE` 块显示当前槽位 `D1/D2/D3`，**点一下循环**：D1 → D2 → D3 → D1；
-- **只有当前槽位收到鼠标/滚轮报告**，其它连接保持不断——切换只改路由，从不 disconnect；
-- 状态条恒显 `● D<n>`：绿 = 该槽在线、琥珀 = 该槽离线但还有别的在线、灰 = 一台都没有；
-- 槽位空或离线时报告静默丢弃，**不会自动跳到别的设备**（避免标签自己乱跳）；
-- 第二、三台设备连进来会落到空闲槽位；三槽都占满时，淘汰"不在线且最久没用"的那个。
+## Screenshots
 
-## 实机截图
-
-| 滑动模式（空闲） | 抽屉：VIBRATION / MODE / DEVICE |
+| Slide mode (idle) | Drawer: VIBRATION / MODE / DEVICE |
 | --- | --- |
-| ![滑动模式](outputs/screenshots/readme-panel.png) | ![抽屉](outputs/screenshots/readme-drawer.png) |
+| ![slide mode](outputs/screenshots/readme-panel.png) | ![drawer](outputs/screenshots/readme-drawer.png) |
 
-| 滑动中（滚轮提示，3 秒后自动隐去） | 鼠标模式 |
+| Swiping (wheel hint, hides after 3 s) | Mouse mode |
 | --- | --- |
-| ![滑动提示](outputs/screenshots/readme-scroll.png) | ![鼠标模式](outputs/screenshots/readme-mouse.png) |
+| ![scroll hint](outputs/screenshots/readme-scroll.png) | ![mouse mode](outputs/screenshots/readme-mouse.png) |
 
-## 屏幕
+## Screen
 
-```
-┌──────────────────────────────────────────────┐
-│ CORE2 PANEL   [SLIDE]  ● D1   ((|)) 86%       │  ← 状态条
-├──────────────────────────────────────────────┤
-│                                              │
-│           整块都是手势区                      │
-│      （空闲提示 / 滚动提示 / 点击涟漪 / 长按进度环）│
-│                                              │
-└──────────────────────────────────────────────┘
-```
+The status bar holds the title, the mode chip (blue SLIDE / amber MOUSE), the current host slot
+`● D1` and the battery; a small vibration icon appears when haptics are on.
 
-- 未连接：状态条显示 `WAITING`，面板底部盖 `NOT CONNECTED` 水印，手势不发送
-- 空闲 3 秒亮度降到 20%，一碰立刻回满
-- 无动作满 **5 分钟**：关屏 + CPU 降到 80 MHz，BLE 保持连接；轻触立即唤醒（这一下不算手势）
-- 关屏后再过 **5 分钟**仍没人碰：进入 **ESP32 deep sleep**，靠触摸面板的 INT（GPIO39 低电平）唤醒
-- **侧边电源键短按一下**：不用等，立刻进入 deep sleep；**长按**仍是 AXP 的硬件关机
+- the bottom of the panel hints at the gestures; a swipe replaces it with direction, notch count and a progress bar for 3 s
+- after 3 s idle the backlight fades to 20 %, and any touch brings it back immediately
+- after 5 min idle the screen turns off and the CPU drops to 80 MHz; 5 min later the board enters deep sleep, and a touch wakes it
+- a short press of the side power button enters deep sleep right away; a long press is still the AXP hardware power-off
 
-## 串口调试（921600）
+## Serial console (921600)
 
-| 命令 | 作用 |
+| Command | What it does |
 | --- | --- |
-| `C2_INFO` | 版本 / 模式 / 振动 / 连接 / 抽屉 / 开机次数 / uptime |
-| `C2_BLE` | BLE server、HID 服务句柄、连接状态 |
-| `C2_CCCD` | 两个输入报告的订阅位（`0100` 才算已订阅） |
-| `C2_MODE <0\|1>` | 0 = SLIDE，1 = MOUSE |
-| `C2_VIB <0\|1>` | 振动开关 |
-| `C2_BUZZ` | 手动震一下；`ok=1` 说明马达在线 |
-| `C2_DISC` | 断开当前槽位的链路（用来测重连） |
-| `C2_HOSTS` | 列出在线连接：conn / 槽位 / 地址 / 是否当前槽位 |
-| `C2_HOST <1\|2\|3>` | 直接切到某个槽位（等价于点 DEVICE） |
-| `C2_SLEEP` | 立即进入第一段睡眠（关屏降频） |
-| `C2_DEEPSLEEP` | 立即进入 deep sleep（不返回，靠触摸唤醒） |
-| `C2_T <0\|1> <x> <y>` | 注入触摸事件，做端到端测试；`C2_T 9` 交还真实触摸 |
-| `C2_SCREEN` | 整屏 RGB888 截图（配 `tools/c2_screenshot.py`） |
+| `C2_INFO` | version, mode, haptics, connection count, slot, drawer state, boot count, uptime |
+| `C2_BLE` | BLE server, HID service handle, connection state |
+| `C2_CCCD` | subscription bits of the two input reports (`0100` = subscribed) |
+| `C2_MODE <0\|1>` | 0 = SLIDE, 1 = MOUSE |
+| `C2_VIB <0\|1>` | haptics on/off |
+| `C2_BUZZ` | buzz once; `ok=1` means the motor is wired up |
+| `C2_DISC` | drop the link of the current slot (for reconnect tests) |
+| `C2_HOSTS` | list live connections: conn / slot / address / active |
+| `C2_HOST <1\|2\|3>` | select a slot directly |
+| `C2_T <0\|1> <x> <y>` | inject a touch; `C2_T 9` hands control back to the panel |
+| `C2_SCREEN` | full-screen RGB888 capture (`tools/c2_screenshot.py` saves it) |
+| `C2_SLEEP` | enter the first sleep stage now |
+| `C2_DEEPSLEEP` | enter deep sleep now |
 
-### 端到端验证（Windows）
+## End-to-end check
 
 ```bash
-pwsh tools/c2_e2e.ps1            # 挂鼠标钩子，用 C2_T 打手势，看系统是否真收到
+pwsh tools/c2_e2e.ps1
 ```
 
-覆盖：上下滑 → 滚轮、单击 → 左键、长按 → 右键、拖动 → 移动、左缘滑入 → 抽屉、
-点 VIBRATION / MODE、点外部收起。改完连接或手势相关的代码先跑它。
+Hooks the Windows mouse API, injects touches through `C2_T` and asserts wheel, clicks, movement,
+drawer switching, slot cycling and host routing — 17 checks.
 
-## 实现要点
+## Verified
 
-- **HID 复合设备保留键盘 + 鼠标两个报告**，v2 只发鼠标报告：描述符不变，主机**不需要重新配对**
-- 鼠标报告 4 字节 `[buttons, dx, dy, wheel]`，不带 Report ID（主机栈把特征值整体当报告本体）
-- 长按在 500 ms 整点触发，抬手早了就取消；单击上限 220 ms、位移上限 10px
-- 鼠标模式的位移**没有死区**：1px 就发；10px 只用来区分"单击"还是"拖动"
-- 连接后主动请求 7.5ms 连接间隔（Windows 实际给 11.25ms），串口打 `[BLE] conn interval=`
-- 拖拽判定：第一次移动时若已按住 ≥ 300 ms 就按下左键，抬手松开；先动后停不会误触发
-- 左缘手势（x<16）整段不参与滚动/鼠标移动，避免误触
-- 渲染走 `M5Canvas` 全屏重绘 + `pushSprite`，动画期间限速 ~25fps
-
-## 踩坑记录
-
-### 1. reset 之后主机还显示「已连接」，但按键全没反应
-
-HOGP 输入报告只有在主机订阅（CCCD `0x2902` 写 `0x0001`）后才会发出；规范要求外设替已绑定主机
-跨连接记住这个值，所以 Windows / Android / iOS 重连时**不会重写 CCCD**。
-而 ESP32 的 CCCD 只活在 RAM，reset 就归零，`BLECharacteristic::notify()` 见 0 直接 return，
-**不报错也不打印**。表现为链路、加密都正常，报告却被静默丢弃。
-
-修复：`CccdCB::onWrite()` 只在主机真正写入时落盘，`onConnect()` 时回填 GATT 数据库；
-没记录过就按「有绑定即已订阅」处理。验证：reset 后 `C2_CCCD kb=0100 ms=0100`，滚轮/点击照常。
-
-### 2. 断链后广播没重开，主机再也连不上
-
-在 `onDisconnect` 回调里直接 `startAdvertising()` 经常静默失败（协议栈还没拆完链路），
-结果设备一直“隐身”，主机侧还停在旧状态。现在改成：回调里只置标志，交给 `loop()` 延迟 250ms 重开，
-并且断链期间每 10 秒重试一次。`C2_DISC` 可复现：断开 → 2 秒内主机自动连回。
-
-### 3. 921600 连续灌数据会拖断 BLE
-
-`C2_SCREEN` 一次要发 230KB。整段阻塞在 loop 里发（或在 loop 里无缝猛写）时，软件 BLE 控制器
-抢不到连接事件，链路超时（`reason=0x08`），主机侧表现为“突然掉线且不再自动重连”。
-修法：截图拆成小块，只在串口缓冲放得下时写，每 16 行 `flush()` + 停 30ms 给 BLE 留时间窗。
-改完 3.2 秒传完，全程 `connected=1`。
-
-### 4. 主机缓存了旧的 HID 描述符
-
-改动描述符后，主机按蓝牙地址缓存旧值，删配对重配对也未必清。固件从出厂 base MAC 派生一个
-稳定地址（`base[5] ^= 0x01`），主机就会当成新设备重新读描述符。当前地址 `5C:01:3B:0C:B9:23`。
-
-### 5. Report ID 不该放进报告值
-
-HOGP 规范说报告首字节应为 Report ID，但 Android 的主机栈把特征值整体当报告本体，多出来的 `0x01`
-被当成修饰键，整条错位。结论：发裸报告（鼠标 4 字节）。
-
-## 已验证（Windows + 全局鼠标钩子）
-
-| 验证项 | 结果 |
+| Check | Result |
 | --- | --- |
-| 滑动模式 · 上滑 140px → 向下滚 | 5 × `WHEEL -120` |
-| 滑动模式 · 下滑 140px → 向上滚 | 5 × `WHEEL +120` |
-| 鼠标模式 · 单击 | `LBUTTON_DOWN` / `LBUTTON_UP` |
-| 鼠标模式 · 长按 700ms | 500ms 时 `RBUTTON_DOWN` / `RBUTTON_UP` |
-| 鼠标模式 · 拖动 | 连续 `MOVE` 事件 |
-| 鼠标模式 · 按住后拖动 | `LBUTTON_DOWN` + `MOVE` ×2 + `LBUTTON_UP` |
-| 左缘右滑 | `[UI] drawer open`，无鼠标事件泄漏 |
-| 点 VIBRATION / MODE | `[VIB] -> 0`、`[MODE] -> SLIDE`，抽屉保持打开 |
-| 点抽屉外 | `[UI] drawer close` |
-| 振动马达 | `C2_BUZZ ok=1` |
-| 多设备 · 切到空槽 | 主机 0 个按键事件（报告被丢弃） |
-| 多设备 · 切回原槽 | `LBUTTON_DOWN` 恢复 |
-| 抽屉 · DEVICE | D1 → D2 → D3 → D1 循环，槽位落盘 |
-| 复位持久化 | 模式与振动开关重启后保留（`boot` 计数递增） |
-| 掉线恢复 | `C2_DISC` 后 2 秒内主机自动重连 |
-| 滚动提示 | 滑动结束 3 秒后自动隐去，回到空闲态 |
-| 睡眠 / 唤醒 | `C2_SLEEP` 后 `asleep=1`，触摸即 `asleep=0`，唤醒后手势正常 |
-| deep sleep | `C2_DEEPSLEEP` 后串口完全静默（20 秒 0 字节），无复位重启，RTS 复位可恢复 |
+| SLIDE · swipe up 140 px → scrolls down | 5 × `WHEEL -120` |
+| SLIDE · swipe down 140 px → scrolls up | 5 × `WHEEL +120` |
+| MOUSE · tap | `LBUTTON_DOWN` / `LBUTTON_UP` |
+| MOUSE · hold 700 ms | `RBUTTON_DOWN` / `RBUTTON_UP` at 500 ms |
+| MOUSE · drag | continuous `MOVE` events |
+| MOUSE · hold then drag | `LBUTTON_DOWN` + `MOVE` ×2 + `LBUTTON_UP` |
+| Left-edge swipe | drawer opens, no mouse events leak |
+| Drawer | VIBRATION toggles, MODE switches, DEVICE cycles D1 → D2 → D3 |
+| Tap outside the drawer | closes |
+| Haptics motor | `C2_BUZZ ok=1` |
+| Persistence | mode, haptics and slots survive a reboot |
+| Link recovery | host reconnects within 2 s after `C2_DISC` |
+| Scroll hint | hides 3 s after the last notch |
+| Sleep / wake | `asleep=1` after `C2_SLEEP`, back to 0 on touch |
+| Deep sleep | serial goes silent, RTS reset recovers the board |
+| Multi-host · switch to an empty slot | host receives 0 button events |
+| Multi-host · switch back | `LBUTTON_DOWN` resumes |
 
-## 已知限制
+## Known limitations
 
-- 未做加密绑定（Just Works 直连），同环境里别人也能连上并操作
-- 最多 3 台主机同时在线（BLE 控制器上限），第 4 台连不上是正常现象
-- 槽位只能用"第几台"区分，BLE 外设拿不到主机名
-- 滚轮能否驱动某个 App，取决于它是否响应通用滚动事件
-- 双指手势不可用：Core2 的触摸面板实测只报单点，双指滚动试过没反应，相关实现已移除
-- deep sleep 唤醒是一次**冷启动**：屏幕约 1.5 秒亮、蓝牙约 5 秒重连，做不到"抬手即用"（换来的是 mA 级待机）
-- 振动只有开关（AXP192 LDO3 只能给 1800mV），没有强度分级
-- 电池百分比来自 AXP，USB 供电时显示虚高
+- no encrypted pairing (Just Works), so anyone nearby can connect and type
+- at most 3 hosts online at once; a fourth connection is refused by the controller
+- slots are identified by number only — a BLE peripheral cannot read the host's name
+- whether the wheel scrolls a given app depends on that app handling generic scroll events
+- haptics are on/off only (AXP192 LDO3 gives a fixed 1800 mV), no strength levels
+- two-finger gestures are not supported: the panel reports a single touch point
+- waking from deep sleep is a cold boot — about 1.5 s until the screen is up and 5 s until Bluetooth is back
