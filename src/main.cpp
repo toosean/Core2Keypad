@@ -43,6 +43,7 @@ static constexpr int  MOVE_SLOP   = 10;    // 超过就不算点击
 static constexpr int  NOTCH_PX    = 24;    // 每 24px 一格滚轮
 static constexpr int  MAX_NOTCHES = 12;
 static constexpr uint32_t TAP_MS  = 220;
+static constexpr uint32_t DRAG_ARM_MS = 300;   // 按住不动超过这个时间再移动 = 拖拽
 static constexpr uint32_t HOLD_MS = 500;
 static constexpr uint16_t BUZZ_MS = 40;
 static constexpr uint32_t RIPPLE_MS = 260;
@@ -374,7 +375,7 @@ static int      g_notches = 0;
 static uint32_t g_scrollUntil = 0;
 static int32_t  g_accX = 0, g_accY = 0;
 
-static void mouseMove(int dx, int dy)
+static void mouseMove(int dx, int dy, uint8_t buttons = 0)
 {
     g_accX += dx * 12;          // 1px ≈ 1.2 计数，1/10 定点
     g_accY += dy * 12;
@@ -385,7 +386,7 @@ static void mouseMove(int dx, int dy)
     g_accY -= sy * MOUSE_DIV;
     if (sx > 127) sx = 127; else if (sx < -127) sx = -127;
     if (sy > 127) sy = 127; else if (sy < -127) sy = -127;
-    sendMouse(0, (int8_t)sx, (int8_t)sy, 0);
+    sendMouse(buttons, (int8_t)sx, (int8_t)sy, 0);
 }
 
 static uint32_t g_rippleAt = 0;
@@ -394,8 +395,16 @@ static bool     g_rippleRight = false;
 
 static bool     g_inject = false;
 static bool     g_injPressed = false;
+static uint8_t  g_injCount = 1;          // 1 = 单指，2 = 双指
 static int16_t  g_injX = 0, g_injY = 0;
+static int16_t  g_injX2 = 0, g_injY2 = 0;
 static uint32_t g_injUntil = 0;
+
+static bool     g_dragActive = false;    // 左键按住拖动中
+static bool     g_twoFinger = false;     // 双指滚动中
+static bool     g_waitRelease = false;   // 双指抬起后，剩下的手指不当作新手势
+static int16_t  g_twoLastY = 0;
+static int16_t  g_twoAccum = 0;
 
 static void mouseClick(bool right, int x, int y)
 {
@@ -412,6 +421,62 @@ static void mouseClick(bool right, int x, int y)
     requestRedraw();
 }
 
+// 放弃当前单指手势：如果正在拖拽先把左键松开，其它状态清零，不产生点击
+static void cancelGesture()
+{
+    if (g_dragActive) {
+        sendMouse(0, 0, 0, 0);
+        g_dragActive = false;
+        requestRedraw();
+    }
+    g_pressed = false;
+    g_moved = false;
+    g_rightFired = false;
+    g_notches = 0;
+    g_accum = 0;
+}
+
+// 双指上下滑 = 滚轮，规则和滑动模式一致（每 24px 一格，单次最多 12 格）
+static void feedTwoFinger(int cy)
+{
+    if (!g_twoFinger) {
+        g_twoFinger = true;
+        g_twoLastY = (int16_t)cy;
+        g_twoAccum = 0;
+        g_notches = 0;
+        g_scrollDir = 0;
+        Serial.println("[G] two-finger scroll");
+    }
+    const int dy = cy - g_twoLastY;
+    g_twoLastY = (int16_t)cy;
+    if (!dy) return;
+    g_twoAccum += dy;
+
+    int sent = 0;
+    while (g_notches < MAX_NOTCHES) {
+        if (g_twoAccum >= NOTCH_PX) {
+            g_twoAccum -= NOTCH_PX;
+            g_scrollDir = +1;
+            sendMouse(0, 0, 0, +1);
+        } else if (g_twoAccum <= -NOTCH_PX) {
+            g_twoAccum += NOTCH_PX;
+            g_scrollDir = -1;
+            sendMouse(0, 0, 0, -1);
+        } else {
+            break;
+        }
+        g_notches++;
+        sent++;
+        delay(3);
+    }
+    if (sent) {
+        if (g_notches == sent) buzz(BUZZ_MS);
+        markActivity();
+        g_scrollUntil = millis() + SCROLL_HOLD_MS;
+        requestRedraw(40);
+    }
+}
+
 static void onPress(int x, int y, uint32_t now)
 {
     markActivity();
@@ -426,6 +491,7 @@ static void onPress(int x, int y, uint32_t now)
     g_accum = 0;
     g_accX = g_accY = 0;
     g_scrollDir = 0;
+    g_dragActive = false;
     if (g_drawer) requestRedraw();
 }
 
@@ -451,6 +517,13 @@ static void onRelease(int x, int y, uint32_t now)
     if (g_edge && tx >= EDGE_SWIPE && ty > -60 && ty < 60) { openDrawer(); return; }
 
     if (g_mode == MODE_MOUSE) {
+        if (g_dragActive) {
+            sendMouse(0, 0, 0, 0);
+            g_dragActive = false;
+            Serial.println("[HID] drag end");
+            requestRedraw();
+            return;
+        }
         if (!g_moved && !g_rightFired && dur < TAP_MS) mouseClick(false, g_px, g_py);
         return;
     }
@@ -477,13 +550,24 @@ static void feedTouch(bool pressed, int x, int y)
     const int tx = x - g_x0;
     const int ty = y - g_y0;
 
-    if (!g_moved && (abs(tx) + abs(ty) > MOVE_SLOP)) g_moved = true;
+    if (!g_moved && (abs(tx) + abs(ty) > MOVE_SLOP)) {
+        g_moved = true;
+        // 按住不动一小会儿再划 = 左键拖拽；一按下就划只是移动光标
+        if (g_mode == MODE_MOUSE && !g_rightFired && !g_drawer && !g_edge &&
+            (now - g_t0) >= DRAG_ARM_MS) {
+            sendMouse(0x01, 0, 0, 0);
+            g_dragActive = true;
+            buzz(BUZZ_MS);
+            Serial.println("[HID] drag start");
+            requestRedraw();
+        }
+    }
 
     if (g_drawer || g_edge) return;        // 这两类只在抬手时判定
     if (g_mode == MODE_MOUSE) {
         if (g_rightFired || !g_moved) return;
         markActivity();
-        mouseMove(dx, dy);
+        mouseMove(dx, dy, g_dragActive ? 0x01 : 0);
         return;
     }
 
@@ -527,6 +611,32 @@ static void pollHold(uint32_t now)
     if (now - g_t0 < HOLD_MS) return;
     g_rightFired = true;
     mouseClick(true, g_px, g_py);
+}
+
+// 触摸采样：最多两点，真实触摸或串口注入
+struct TouchSample { uint8_t count; int16_t x[2]; int16_t y[2]; };
+
+static TouchSample readTouchSample(uint32_t now)
+{
+    TouchSample s;
+    s.count = 0; s.x[0] = s.y[0] = s.x[1] = s.y[1] = 0;
+
+    if (g_inject && (int32_t)(now - g_injUntil) < 0) {
+        if (g_injPressed) {
+            s.count = g_injCount;
+            s.x[0] = g_injX; s.y[0] = g_injY;
+            s.x[1] = g_injX2; s.y[1] = g_injY2;
+        }
+        return s;
+    }
+    g_inject = false;
+    const uint8_t n = M5.Touch.getCount();
+    s.count = (n > 2) ? 2 : n;
+    for (uint8_t i = 0; i < s.count; ++i) {
+        const auto &d = M5.Touch.getDetail(i);
+        s.x[i] = d.x; s.y[i] = d.y;
+    }
+    return s;
 }
 
 // ---------------------------------------------------------------- 绘制
@@ -625,7 +735,7 @@ static void drawMouseIdle(bool dim)
     canvas.setFont(&fonts::Font0);
     canvas.setTextDatum(textdatum_t::middle_center);
     canvas.setTextColor(dim ? dimc(C_FAINT) : C_FAINT);
-    canvas.drawString("DRAG MOVE | TAP LEFT | HOLD RIGHT", 160, 219);
+    canvas.drawString("MOVE | TAP=LEFT | HOLD=RIGHT | HOLD+MOVE=DRAG", 160, 219);
 }
 
 static void drawScrollOverlay()
@@ -751,6 +861,14 @@ static void render(uint32_t now)
     }
 
     if (!dim) {
+        if (g_dragActive) {
+            canvas.fillRoundRect(20, 50, 78, 22, 11, C_BLUE_D);
+            canvas.drawRoundRect(20, 50, 78, 22, 11, C_BLUE);
+            canvas.setFont(&fonts::Font0);
+            canvas.setTextDatum(textdatum_t::middle_center);
+            canvas.setTextColor(C_BLUE_L);
+            canvas.drawString("DRAGGING", 59, 61);
+        }
         if (scrolling) drawScrollOverlay();
         if (g_rippleAt && (now - g_rippleAt) < RIPPLE_MS) drawRipple(now);
         if (holdCandidate(now)) drawHoldRing(now);
@@ -943,10 +1061,25 @@ static void handleSerial()
             } else if (command == "C2_T 9") {
                 g_inject = false;
                 Serial.println("C2_T real");
+            } else if (command.startsWith("C2_T2 ")) {
+                int p = -1, x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+                if (sscanf(command.c_str(), "C2_T2 %d %d %d %d %d", &p, &x0, &y0, &x1, &y1) == 5 &&
+                    (p == 0 || p == 1)) {
+                    g_inject = true;
+                    g_injCount = 2;
+                    g_injPressed = (p == 1);
+                    g_injX = (int16_t)x0;  g_injY = (int16_t)y0;
+                    g_injX2 = (int16_t)x1; g_injY2 = (int16_t)y1;
+                    g_injUntil = millis() + 15000;
+                    Serial.printf("C2_T2 %d %d %d %d %d\n", p, x0, y0, x1, y1);
+                } else {
+                    Serial.println("C2_ERROR bad_touch2");
+                }
             } else if (command.startsWith("C2_T ")) {
                 int p = -1, x = 0, y = 0;
                 if (sscanf(command.c_str(), "C2_T %d %d %d", &p, &x, &y) == 3 && (p == 0 || p == 1)) {
                     g_inject = true;
+                    g_injCount = 1;
                     g_injPressed = (p == 1);
                     g_injX = (int16_t)x;
                     g_injY = (int16_t)y;
@@ -1054,29 +1187,36 @@ void loop()
     static bool blocked = false;      // 起点在状态条上的触摸整段忽略
     static uint32_t battAt = 0;
 
-    const bool injected = g_inject && (int32_t)(now - g_injUntil) < 0;
-    const bool touching = injected ? g_injPressed : M5.Touch.getDetail().isPressed();
+    const TouchSample ts = readTouchSample(now);
+    const bool touching = ts.count > 0;
 
     if (g_ignoreTouch) {
         if (!touching) g_ignoreTouch = false;      // 抬手后解除
-    } else if (injected) {
-        feedTouch(g_injPressed, g_injX, g_injY);
-        blocked = false;
-    } else {
-        g_inject = false;
-        const auto &td = M5.Touch.getDetail();
-        if (!td.isPressed()) {
-            blocked = false;
-            feedTouch(false, td.x, td.y);
-        } else if (!g_pressed) {
-            if (!blocked) {
-                if (td.y >= BAR_H) feedTouch(true, td.x, td.y);
-                else blocked = true;
+    } else if (ts.count >= 2) {
+        g_waitRelease = true;
+        if (g_pressed) cancelGesture();            // 第二根手指落下 -> 放弃单指手势
+        feedTwoFinger((ts.y[0] + ts.y[1]) / 2);
+        g_lastInputMs = now;
+    } else if (ts.count == 1) {
+        g_twoFinger = false;
+        if (!g_waitRelease) {
+            if (!g_pressed) {
+                if (ts.y[0] < BAR_H) {
+                    blocked = true;                // 状态条上按下的整段忽略
+                } else {
+                    blocked = false;
+                    feedTouch(true, ts.x[0], ts.y[0]);
+                }
+            } else {
+                feedTouch(true, ts.x[0], ts.y[0]);
             }
-        } else {
-            feedTouch(true, td.x, td.y);
         }
-        if (td.isPressed() || td.wasPressed()) g_lastInputMs = now;
+        g_lastInputMs = now;
+    } else {
+        g_twoFinger = false;
+        g_waitRelease = false;
+        blocked = false;
+        feedTouch(false, g_px, g_py);
     }
 
     pollHold(now);
