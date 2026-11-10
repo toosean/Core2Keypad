@@ -1,0 +1,78 @@
+[BLE] disconnected
+[BLE] connected
+[SEC] auth OK bonded=1
+[TOUCH] active -1 -> 1  at (170,195)
+[KEY] press DOWN mode=KEY conn=1
+[TOUCH] active 1 -> -1  at (170,195)
+[TOUCH] active -1 -> 1  at (170,206)
+[KEY] press DOWN mode=KEY conn=1
+[TOUCH] active 1 -> -1  at (170,206)
+[TOUCH] active -1 -> 1  at (166,192)
+[KEY] press DOWN mode=KEY conn=1
+[TOUCH] active 1 -> -1  at (166,192)
+[TOUCH] active -1 -> 1  at (154,209)
+[KEY] press DOWN mode=KEY conn=1
+[TOUCH] active 1 -> -1  at (154,209)
+[TOUCH] active -1 -> 0  at (164,108)
+[KEY] press UP mode=KEY conn=1
+[TOUCH] active 0 -> -1  at (164,108)
+[TOUCH] active -1 -> 0  at (176,102)
+[KEY] press UP mode=KEY conn=1
+[TOUCH] active 0 -> -1  at (176,102)
+[MODE] -> WHEEL
+[TOUCH] active -1 -> 1  at (158,192)
+[KEY] press DOWN mode=WHEEL conn=1
+[TOUCH] active 1 -> -1  at (158,192)
+[TOUCH] active -1 -> 1  at (164,180)
+[KEY] press DOWN mode=WHEEL conn=1
+[TOUCH] active 1 -> -1  at (164,180)
+[TOUCH] active -1 -> 0  at (166,101)
+[KEY] press UP mode=WHEEL conn=1
+[TOUCH] active 0 -> -1  at (166,101)
+[TOUCH] active -1 -> 0  at (178,65)
+[KEY] press UP mode=WHEEL conn=1
+[TOUCH] active 0 -> -1  at (178,65)
+[TOUCH] active -1 -> 1  at (166,177)
+[KEY] press DOWN mode=WHEEL conn=1
+[TOUCH] active 1 -> -1  at (166,177)
+[TOUCH] active -1 -> 1  at (166,139)
+[KEY] press DOWN mode=WHEEL conn=1
+[TOUCH] active 1 -> -1  at (166,139)
+[TOUCH] active -1 -> 0  at (184,61)
+[KEY] press UP mode=WHEEL conn=1
+[TOUCH] active 0 -> -1  at (184,61)
+[TOUCH] active -1 -> 1  at (176,150)
+[KEY] press DOWN mode=WHEEL conn=1
+[TOUCH] active 1 -> -1  at (176,150)
+[TOUCH] active -1 -> 0  at (158,82)
+[KEY] press UP mode=WHEEL conn=1
+[TOUCH] active 0 -> -1  at (158,82)
+[TOUCH] active -1 -> 1  at (158,192)
+[KEY] press DOWN mode=WHEEL conn=1
+[TOUCH] active 1 -> -1  at (158,192)
+[MODE] -> KEY
+[TOUCH] active -1 -> 1  at (172,186)
+[KEY] press DOWN mode=KEY conn=1
+[TOUCH] active 1 -> -1  at (172,186)
+[TOUCH] active -1 -> 0  at (172,107)
+[KEY] press UP mode=KEY conn=1
+[TOUCH] active 0 -> -1  at (172,107)
+[TOUCH] active -1 -> 1  at (148,202)
+[KEY] press DOWN mode=KEY conn=1
+[TOUCH] active 1 -> -1  at (148,202)
+[TOUCH] active -1 -> 0  at (156,108)
+[KEY] press UP mode=KEY conn=1
+[TOUCH] active 0 -> -1  at (156,108)
+[TOUCH] active -1 -> 1  at (148,173)
+[KEY] press DOWN mode=KEY conn=1
+[TOUCH] active 1 -> -1  at (148,173)
+[MODE] -> WHEEL
+[TOUCH] active -1 -> 1  at (158,206)
+[KEY] press DOWN mode=WHEEL conn=1
+[TOUCH] active 1 -> -1  at (158,206)
+[TOUCH] active -1 -> 0  at (158,101)
+[KEY] press UP mode=WHEEL conn=1
+[TOUCH] active 0 -> -1  at (158,101)
+[TOUCH] active -1 -> 1  at (158,179)
+[KEY] press DOWN mode=WHEEL conn=1
+[TOUCH] active 1 -> -1  at (158,179)

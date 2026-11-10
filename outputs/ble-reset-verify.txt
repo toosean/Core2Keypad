@@ -1,0 +1,54 @@
+BLE reset 问题：诊断与修复验证
+================================
+设备 5C:01:3B:0C:B9:23（Core2 Keypad） · Windows 蓝牙 · 串口 COM6 @ 921600 · 2026-11-10
+
+一、修复前的现场（v1.3）
+------------------------
+reset 后主机仍显示「已连接」，设备侧也认为连着：
+
+  [BLE] connected
+  [SEC] auth OK bonded=1
+  [KEY] press UP mode=KEY conn=1          <- 设备以为发出去了
+  [HID] kb DROP cccd-not-subscribed       <- notify() 发之前就丢弃
+  C2_CCCD kb=0000 ms=0000 conn=1 peers=1  <- 两个输入报告的订阅位都是 0
+
+整个重连过程没有任何 [CCCD] HOST WRITE 记录 —— 主机没有重写 CCCD。
+Windows 全局键盘钩子：0 个事件。
+
+二、根因
+--------
+HOGP 的输入报告只有在主机订阅后才会被发出，订阅状态就是报告特征下 CCCD(0x2902) 的
+值；蓝牙规范要求外设替已绑定主机跨连接记住它（Core 3.G §3.3.3.3），所以
+Windows / Android / iOS 重连时都不会重写 CCCD。
+而 ESP32 的 CCCD 只存在 RAM 里，reset 后归零；Arduino BLE 的
+BLECharacteristic::notify() 会先看本地 0x2902，为 0 就直接 return，不报错也不打印。
+于是链路、加密、句柄全部正常，报告却被静默丢弃 —— 主机侧就是「连着但没反应」。
+
+三、修复（v1.4）
+----------------
+1. CccdCB::onWrite()：只在主机真正写 0x2902 时把状态存 NVS（避免开机默认值冲掉记录）
+2. ServerCB::onConnect()：读回记录并 setValue({0x01,0x00})，同时写进协议栈属性表
+3. 没记录过时按「有绑定即已订阅」处理；主机显式退订则尊重 0
+4. 保留 [HID] DROP / [CCCD] 诊断日志，同类问题不再静默
+
+四、修复后同一场景
+------------------
+硬重置（RTS 拉低 EN，等价于按 reset 键）→ 4 秒后自动重连，主机侧未做任何操作：
+
+  [KEY] ready  mode=KEY  heap=121708  btMac=5C:01:3B:0C:B9:23
+  [SEC] auth OK bonded=1
+  [BLE] connected
+  [CCCD] set notify=1 handle=67
+  [CCCD] set notify=1 handle=71
+  [CCCD] restore bonded=1 saved kb=-1 ms=-1 -> live kb=1 ms=1
+  C2_CCCD kb=0100 ms=0100 conn=1 peers=1
+
+Windows 全局键盘钩子（仅列方向键，其余是操作者自己敲的）：
+
+  DOWN vk=38 scan=0x48        <- ↑ 按下
+  UP   vk=38 scan=0x48
+  DOWN vk=40 scan=0x50        <- ↓ 按下
+  UP   vk=40 scan=0x50
+
+连续 reset 多次结果一致，无需删除设备、无需重新配对。
+WHEEL 模式同样验证：kb/ms 均为 0100，notify 不再出现 DROP。

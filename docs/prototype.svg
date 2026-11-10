@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Core2Keypad —— M5Stack Core2 屏幕原型（320x240 横屏）
+  和固件一一对应：顶部状态条 + 两个触摸键（14..242）+ 右侧模式开关（250..306）。
+  按钮 center-y：上 82、下 174；右侧两段：KEY 44..126（center 85）、WHEEL 130..212（center 171）。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"
+     font-family="'Segoe UI','Inter',system-ui,-apple-system,sans-serif">
+
+  <rect width="320" height="240" fill="#0A0F15"/>
+
+  <!-- 顶部状态条 -->
+  <text x="14" y="19" font-size="9.5" letter-spacing="2" fill="#54677A">CORE2 HID KEYPAD</text>
+  <circle cx="232" cy="15" r="3.6" fill="#34D399"/>
+  <text x="241" y="18.6" font-size="9" letter-spacing="1.4" fill="#6EE7B7">CONNECTED</text>
+  <text x="306" y="18.6" font-size="9" letter-spacing="1" fill="#4A6379" text-anchor="end">100%</text>
+  <line x1="0" y1="30" x2="320" y2="30" stroke="#16232E" stroke-width="1"/>
+
+  <!-- ============ 上键（40..124，center 82）============ -->
+  <g>
+    <rect x="14" y="40" width="228" height="84" rx="16" fill="#0E1620" stroke="#1B2C3A" stroke-width="1"/>
+    <rect x="28" y="56" width="4" height="52" rx="2" fill="#38BDF8"/>
+    <path d="M40 91 L52 73 L64 91" fill="none" stroke="#38BDF8" stroke-width="7"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="80" y="86" font-size="30" font-weight="700" letter-spacing="2.5" fill="#E8F2FF">UP</text>
+    <text x="80" y="103" font-size="9.5" letter-spacing="1.6" fill="#4A6379">ARROW UP</text>
+  </g>
+
+  <!-- ============ 下键（132..216，center 174）============ -->
+  <g>
+    <rect x="14" y="132" width="228" height="84" rx="16" fill="#0E1620" stroke="#1B2C3A" stroke-width="1"/>
+    <rect x="28" y="148" width="4" height="52" rx="2" fill="#FBBF24"/>
+    <path d="M40 165 L52 183 L64 165" fill="none" stroke="#FBBF24" stroke-width="7"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="80" y="178" font-size="30" font-weight="700" letter-spacing="2.5" fill="#E8F2FF">DOWN</text>
+    <text x="80" y="195" font-size="9.5" letter-spacing="1.6" fill="#4A6379">ARROW DOWN</text>
+  </g>
+
+  <!-- ============ 右侧模式开关 ============ -->
+  <rect x="250" y="40" width="56" height="176" rx="16" fill="#0B121A" stroke="#1B2C3A" stroke-width="1"/>
+
+  <!-- 选中：KEY -->
+  <rect x="254" y="44" width="48" height="82" rx="12" fill="#102A38" stroke="#38BDF8" stroke-width="1.5"/>
+  <text x="278" y="89" font-size="11" font-weight="600" letter-spacing="0.5"
+        fill="#FFFFFF" text-anchor="middle">KEY</text>
+
+  <!-- 未选中：WHEEL -->
+  <rect x="254" y="130" width="48" height="82" rx="12" fill="#0E1620" stroke="#1B2C3A" stroke-width="1"/>
+  <text x="278" y="175" font-size="11" font-weight="600" letter-spacing="0.5"
+        fill="#4A6379" text-anchor="middle">WHEEL</text>
+
+  <!-- 底部提示 -->
+  <text x="132" y="231" font-size="8.5" letter-spacing="1.6" fill="#3A4856"
+        text-anchor="middle">TOUCH TO SEND</text>
+</svg>

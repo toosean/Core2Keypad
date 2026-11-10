@@ -1,0 +1,13 @@
+# PlatformIO 构建产物（几百 MB，绝不入库）
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# 编辑器 / 系统
+.vscode/
+*.bak
+*.swp
+~$*
+
+# 体积较大的历史测试截图，保留 outputs/screenshots 与文本证据
+outputs/keytest/
