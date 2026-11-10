@@ -24,6 +24,8 @@
 #include <BLE2902.h>
 #include <BLESecurity.h>
 #include <Preferences.h>
+#include <esp_sleep.h>
+#include <driver/rtc_io.h>
 
 // ---------------------------------------------------------------- 屏幕几何
 static constexpr int W = 320;
@@ -48,7 +50,9 @@ static constexpr uint32_t HOLD_MS = 500;
 static constexpr uint16_t BUZZ_MS = 40;
 static constexpr uint32_t RIPPLE_MS = 260;
 static constexpr uint32_t SCROLL_HOLD_MS = 3000;   // 滑动结束后提示再留 3 秒
-static constexpr uint32_t SLEEP_MS = 5UL * 60UL * 1000UL;  // 5 分钟无动作 -> 睡眠
+static constexpr uint32_t SLEEP_MS = 5UL * 60UL * 1000UL;  // 5 分钟无动作 -> 关屏降频
+static constexpr uint32_t DEEP_SLEEP_MS = 5UL * 60UL * 1000UL;  // 关屏后再 5 分钟没人碰 -> 真睡眠
+static constexpr int      TOUCH_INT_PIN = 39;   // FT6336 INT：按下为低电平
 static constexpr int  MOUSE_DIV   = 10;    // 定点：1px = 12/10 个鼠标计数
 
 // ---------------------------------------------------------------- 颜色
@@ -109,6 +113,7 @@ static uint16_t g_boots     = 0;   // 开机次数（NVS），用来抓意外重
 static bool     g_asleep    = false;
 static bool     g_ignoreTouch = false;   // 唤醒那一下不算手势
 static uint32_t g_lastActionMs = 0;      // 最后一次「用户动作」
+static uint32_t g_sleepSince = 0;        // 进入第一段睡眠的时刻
 static Preferences g_prefs;
 
 // 重绘调度
@@ -852,6 +857,29 @@ static void enterSleep(uint32_t now)
     M5.Display.setBrightness(0);
     M5.Display.sleep();
     setCpuFrequencyMhz(80);
+    g_sleepSince = now;
+}
+
+// 第二段：关屏后仍没人碰 -> 真睡眠。BLE 会断开（醒来重连），
+// 但功耗从 ~25mA 降到 mA 级；触摸面板 INT(GPIO39) 按下拉低，直接当唤醒源。
+static void enterDeepSleep()
+{
+    Serial.println("[PWR] deep sleep, wake by touch (GPIO39 low)");
+    Serial.flush();
+
+    // 干净地断开，别让主机停在“已连接”的假状态
+    if (g_connected && g_server) {
+        g_server->disconnect(g_server->getConnId());
+        delay(200);
+    }
+    M5.Display.setBrightness(0);
+    M5.Display.sleep();
+
+    rtc_gpio_pulldown_dis((gpio_num_t)TOUCH_INT_PIN);
+    rtc_gpio_pullup_en((gpio_num_t)TOUCH_INT_PIN);
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)TOUCH_INT_PIN, 0);
+    delay(50);
+    esp_deep_sleep_start();
 }
 
 static void wakeUp(uint32_t now)
@@ -984,8 +1012,10 @@ static void handleSerial()
                     Serial.println("C2_DISC not_connected");
                 }
             } else if (command == "C2_SLEEP") {
-                enterSleep(millis() + SLEEP_MS);      // 强制睡眠（测试用）
+                enterSleep(millis() + SLEEP_MS);      // 第一段：关屏降频
                 Serial.println("C2_SLEEP ok");
+            } else if (command == "C2_DEEPSLEEP") {
+                enterDeepSleep();                     // 第二段：真睡眠（不返回）
             } else if (command == "C2_BUZZ") {
                 const bool ok = M5.Power.setVibration(1);
                 if (ok) { delay(BUZZ_MS); M5.Power.setVibration(0); }
@@ -1055,6 +1085,11 @@ void setup()
     const int lvl = M5.Power.getBatteryLevel();
     g_battPct = (lvl < 0) ? 0 : (uint8_t)lvl;
 
+    const esp_sleep_wakeup_cause_t wake_cause = esp_sleep_get_wakeup_cause();
+    if (wake_cause != ESP_SLEEP_WAKEUP_UNDEFINED) {
+        Serial.printf("[PWR] wake cause=%d (2=ext0/touch)\n", (int)wake_cause);
+    }
+
     bleInit();
     render(millis());
 
@@ -1078,6 +1113,8 @@ void loop()
         if (touching) {
             wakeUp(now);
             g_ignoreTouch = true;
+        } else if ((uint32_t)(now - g_sleepSince) > DEEP_SLEEP_MS) {
+            enterDeepSleep();          // 不返回
         } else {
             handleSerial();
             delay(20);

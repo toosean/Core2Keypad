@@ -307,7 +307,7 @@
     <text x="812" y="786" font-size="11.5" font-weight="600" letter-spacing="0.6" fill="#8FA6B8">状态与降级</text>
     <text x="812" y="812" font-size="10.2" fill="#4E6478">未连接：面板盖 NOT CONNECTED 水印，手势不发</text>
     <text x="812" y="832" font-size="10.2" fill="#4E6478">鼠标灵敏度：1 屏幕像素 ≈ 1.2 个鼠标计数</text>
-    <text x="812" y="852" font-size="10.2" fill="#4E6478">空闲 3 秒降到 20% 亮度；5 分钟无动作自动睡眠，轻触即醒</text>
+    <text x="812" y="852" font-size="10.2" fill="#4E6478">空闲 3 秒降到 20%；5 分钟关屏降频，再 5 分钟深睡；触摸即醒</text>
     <text x="812" y="872" font-size="10.2" fill="#4E6478">振动 / 模式选择都写 NVS，重启保留</text>
   </g>
 
